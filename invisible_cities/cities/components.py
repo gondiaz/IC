@@ -462,8 +462,7 @@ def build_pointlike_event(dbfile, run_number, drift_v,
     return build_pointlike_event
 
 
-def get_peak_s2_energy(peak: invisible_cities.evm.pmaps.S2,
-                       pmt_ids: np.array):
+def get_peak_s2_energy(peak, pmt_ids):
     s2_pmts = peak.pmts.all_waveforms
     c = np.zeros(s2_pmts.shape[0])
     c[pmt_ids] = 1
