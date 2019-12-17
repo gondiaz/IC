@@ -62,6 +62,7 @@ def dorothea(files_in, file_out, compression, event_range, print_mod, detector_d
              drift_v,
              s1_nmin, s1_nmax, s1_emin, s1_emax, s1_wmin, s1_wmax, s1_hmin, s1_hmax, s1_ethr,
              s2_nmin, s2_nmax, s2_emin, s2_emax, s2_wmin, s2_wmax, s2_hmin, s2_hmax, s2_ethr, s2_nsipmmin, s2_nsipmmax,
+             pmt_ids,
              global_reco_params=dict()):
     # global_reco_params are qth, qlm, lm_radius, new_lm_radius, msipm
     # qlm           =  0 * pes every Cluster must contain at least one SiPM with charge >= qlm
@@ -78,7 +79,7 @@ def dorothea(files_in, file_out, compression, event_range, print_mod, detector_d
     pmap_select           = fl.count_filter(bool, args="pmap_passed")
 
     reco_algo             = compute_xy_position(detector_db, run_number, **global_reco_params)
-    build_pointlike_event = fl.map(build_pointlike_event_(detector_db, run_number, drift_v, reco_algo),
+    build_pointlike_event = fl.map(build_pointlike_event_(detector_db, run_number, drift_v, reco_algo, pmt_ids),
                                    args = ("pmap", "selector_output", "event_number", "timestamp"),
                                    out  = "pointlike_event"                                       )
 

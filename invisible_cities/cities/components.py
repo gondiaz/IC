@@ -394,7 +394,10 @@ def compute_z_and_dt(t_s2, t_s1, drift_v):
 
 
 def build_pointlike_event(dbfile, run_number, drift_v,
-                          reco, charge_type = SiPMCharge.raw):
+                          reco, charge_type = SiPMCharge.raw,
+                          pmt_ids = "all"):
+    if pmt_ids == "all": pmt_ids = np.arange(12)
+
     datasipm   = load_db.DataSiPM(dbfile, run_number)
     sipm_xs    = datasipm.X.values
     sipm_ys    = datasipm.Y.values
@@ -423,7 +426,8 @@ def build_pointlike_event(dbfile, run_number, drift_v,
             evt.nS2 += 1
             evt.S2w.append(peak.width / units.mus)
             evt.S2h.append(peak.height)
-            evt.S2e.append(peak.total_energy)
+            #evt.S2e.append(peak.total_energy)
+            evt.S2e.append( get_peak_s2_energy(peak, pmt_ids) )
             evt.S2t.append(peak.time_at_max_energy)
 
             xys = sipm_xys[peak.sipms.ids           ]
@@ -456,6 +460,15 @@ def build_pointlike_event(dbfile, run_number, drift_v,
         return evt
 
     return build_pointlike_event
+
+
+def get_peak_s2_energy(peak: invisible_cities.evm.pmaps.S2,
+                       pmt_ids: np.array):
+    s2_pmts = peak.pmts.all_waveforms
+    c = np.zeros(s2_pmts.shape[0])
+    c[pmt_ids] = 1
+    sel_s2 = np.multiply( c, s2_pmts.T ).T
+    return np.sum(sel_s2)
 
 
 def hit_builder(dbfile, run_number, drift_v, reco,
