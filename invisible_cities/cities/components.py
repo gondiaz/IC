@@ -530,17 +530,18 @@ def hit_builder(dbfile, run_number, drift_v, reco,
                                                  charge_type       ,
                                                  single_point=False)
             #select pmt wf
-	    s2_pmts = peak.pmts.all_waveforms
+            s2_pmts = peak.pmts.all_waveforms
             c = np.zeros(s2_pmts.shape[0])
             c[pmt_ids] = 1
             sel_s2 = np.multiply(c, s2_pmts.T ).T
+            sel_s2 = np.sum( sel_s2, axis=0)
 
             for slice_no, (t_slice, qs) in enumerate(zip(peak.times ,
                                                          sipm_charge)):
                 z_slice = (t_slice - s1_t) * units.ns * drift_v
                 #e_slice = peak.pmts.sum_over_sensors[slice_no]
-		e_slice = sel_s2[slice_no]
-		try:
+                e_slice = sel_s2[slice_no]
+                try:
                     xys      = sipm_xys[peak.sipms.ids]
                     clusters = reco(xys, qs)
                     es       = hif.split_energy(e_slice, clusters)
