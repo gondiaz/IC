@@ -20,23 +20,33 @@ from invisible_cities.cities import detsim_functions as fn
 def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filename, psfsipm_filename,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
            el_gain, conde_policarpo_factor, EP_z, EL_dz,
-           wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time):
+           wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time, s1_dtime):
 
     ########################
     ######## Globals #######
     ########################
     datapmt  = db.DataPMT (detector_db, run_number)
     datasipm = db.DataSiPM(detector_db, run_number)
-
-    el_gain_sigma = np.sqrt( el_gain * conde_policarpo_factor)
+    npmts  = len(datapmt)
+    nsipms = len(datasipm)
 
     S2pmt_psf  = partial(fn._psf, factor=1e5)
     S2sipm_psf = partial(fn._psf, factor=1e5)
     S1pmt_psf  = partial(fn._psf, factor=1e5)
 
-    ###########################################################
-    ################### SIMULATE ELECTRONS ####################
-    ###########################################################
+    el_gain_sigma = np.sqrt(el_gain * conde_policarpo_factor)
+    EL_dtime      =  EL_dz / drift_velocity
+
+    wf_pmt_nbins     = int(wf_buffer_time // wf_pmt_bin_time)
+    wf_sipm_nbins    = int(wf_buffer_time // wf_sipm_bin_time)
+
+    s1_nsamples      = np.max((int(s1_dtime // wf_pmt_bin_time ), 1))
+    s2_pmt_nsamples  = np.max((int(EL_dtime // wf_pmt_bin_time ), 1))
+    s2_sipm_nsamples = np.max((int(EL_dtime // wf_sipm_bin_time), 1))
+
+    ##########################################
+    ############ SIMULATE ELECTRONS ##########
+    ##########################################
     generate_electrons = fl.map(partial(fn.generate_electrons, wi = wi, fano_factor = fano_factor),
                                 args = ("energy"), out  = ("electrons"))
 
@@ -48,9 +58,9 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
 
     simulate_electrons = fl.pipe( generate_electrons, drift_electrons, diffuse_electrons )
 
-    ###########################################################
-    #################### SIMULATE PHOTONS #####################
-    ###########################################################
+    ############################################
+    ############ SIMULATE PHOTONS ##############
+    ############################################
     generate_S1_photons = fl.map(partial(fn.generate_s1_photons, ws = ws),
                                  args = ("energy"), out  = ("S1photons"))
 
@@ -74,8 +84,22 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     ############################
     ###### BUFFER TIMES ########
     ############################
-    S1_buffer_times = fl.map(lambda x   : wf_buffer_time/2. - np.min(x)/drift_velocity, args = ("dz")                  , out=("S1_buffer_times"))
-    S2_buffer_times = fl.map(lambda x, y: x/drift_velocity + y                        , args = ("dz", "S1_buffer_time"), out=("S2_buffer_times"))
+    S1_buffer_times = fl.map(lambda dz, z: (wf_buffer_time/2. - np.min(dz)/drift_velocity)*np.ones_like(z), args = ("dz", "z"), out=("S1_buffer_times"))
+    S2_buffer_times = fl.map(lambda x, y: x/drift_velocity + np.max(y), args = ("dz", "S1_buffer_times"), out=("S2_buffer_times"))
+
+    ############################
+    ### CREATE AND FILL WFS ####
+    ############################
+    create_empty_pmt_waveforms  = fl.map(lambda x: np.zeros((wf_pmt_nbins ,  npmts), dtype = int), args=("evt"), out=("pmtwfs"))
+    create_empty_sipm_waveforms = fl.map(lambda x: np.zeros((wf_sipm_nbins, nsipms), dtype = int), args=("evt"), out=("sipmwfs"))
+
+
+    fill_S1_pmts = fl.map(partial(fn.sample_photons_and_fill_wfs, wf_bin_time = wf_pmt_bin_time, nsamples = s1_nsamples),
+                          args = ("S1_buffer_times", "S1photons_pmt", "pmtwfs"), out=("pmtwfs"))
+    fill_S2_pmts = fl.map(partial(fn.sample_photons_and_fill_wfs, wf_bin_time = wf_pmt_bin_time, nsamples = s2_pmt_nsamples),
+                          args = ("S2_buffer_times", "S2photons_pmt", "pmtwfs"), out=("pmtwfs"))
+    fill_S2_sipms = fl.map(partial(fn.sample_photons_and_fill_wfs, wf_bin_time = wf_sipm_bin_time, nsamples = s2_sipm_nsamples),
+                          args = ("S2_buffer_times", "S2photons_sipm", "sipmwfs"), out=("sipmwfs"))
 
 
     with tb.open_file(file_out, "w") as h5out:
@@ -91,6 +115,11 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
                                        simulate_photons,
                                        S1_buffer_times,
                                        S2_buffer_times,
+                                       create_empty_pmt_waveforms,
+                                       create_empty_sipm_waveforms,
+                                       fill_S1_pmts,
+                                       fill_S2_pmts,
+                                       #fill_S2_sipms,
                                        fl.spy(print),
                                        sinkpipe),
                         result = ())

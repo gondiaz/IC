@@ -128,3 +128,35 @@ def _psf(dx, dy, dz, factor = 1.):
     """ generic analytic PSF function
     """
     return factor * np.abs(dz) / (2 * np.pi) / (dx**2 + dy**2 + dz**2)**1.5
+
+
+##################################
+######### WAVEFORMS ##############
+##################################
+def bincounter(xs, dx = 1., x0 = 0.):
+    ixs    = ((xs + x0) // dx).astype(int)
+    return np.unique(ixs, return_counts=True)
+
+def sample_photons_and_fill_wfs(ts          : np.array,
+                                phs         : np.array,
+                                wfs         : np.array,
+                                wf_bin_time : float,
+                                nsamples    : int):
+
+    """ Create the wfs starting from the photons arrived at each sensor.
+    The control parameters are the wf_bin_time and the nsamples.
+    Returns: waveforms
+    """
+    def _wf(its, iphs, iwf):
+        if (np.sum(iphs) <= 0): return iwf
+        isel       = iphs > 0
+        nts        = np.repeat(its[isel], iphs[isel])
+        sits, sphs = bincounter(nts, wf_bin_time)
+        sphsn      = np.random.poisson(sphs/nsamples, size = (nsamples, sphs.size))
+        for kk, kphs in enumerate(sphsn):
+            iwf[sits + kk] = iwf[sits + kk] + kphs
+        return iwf
+
+    [_wf(ts, iphs, iwf) for iphs, iwf in zip(phs.T, wfs.T)]
+
+    return wfs
