@@ -30,16 +30,6 @@ def load_MC(files_in : List[str]) -> Generator:
 ######### ELECTRON SIMULATION #########
 #######################################
 
-def bincounterdd(xxs, dxs = 1., x0s = 0., n = 1000):
-    xs = np.array(xxs, dtype = float).T
-    dxs = np.ones_like(xs) * dxs
-    x0s = np.ones_like(xs) * x0s
-
-    ixs = ((xs - x0s) // dxs).astype(int)
-    ids, ccs =  np.unique(ixs, axis = 0, return_counts = True)
-    return ids.T, ccs
-
-
 def generate_electrons(energies    : np.array,
                        wi          : float,
                        fano_factor : float ) -> np.array:
@@ -69,23 +59,72 @@ def diffuse_electrons(xs                     : np.array,
                       zs                     : np.array,
                       electrons              : np.array,
                       transverse_diffusion   : float,
-                      longitudinal_diffusion : float,
-                      voxel_sizes            : np.array)\
+                      longitudinal_diffusion : float)\
                       -> Tuple[np.array, np.array, np.array, np.array]:
     """
     starting from a voxelized electrons with positions xs, ys, zs, and number of electrons,
     apply diffusion and return voxelixed electrons with positions xs, ys, zs, an electrons
     the voxel_size arguement controls the size of the voxels for the diffused electrons
     """
-    nes = electrons.astype(int)
-    voxel_sizes = np.array(voxel_sizes)
-    xs = np.repeat(xs, nes); ys = np.repeat(ys, nes); zs = np.repeat(zs, nes)
+    xs = np.repeat(xs, electrons.astype(int))
+    ys = np.repeat(ys, electrons.astype(int))
+    zs = np.repeat(zs, electrons.astype(int))
 
     sqrtz = zs ** 0.5
-    vxs  = np.random.normal(xs, sqrtz * transverse_diffusion)
-    vys  = np.random.normal(ys, sqrtz * transverse_diffusion)
-    vzs  = np.random.normal(zs, sqrtz * longitudinal_diffusion)
-    vnes = np.ones(vxs.size)
-    vpos, vnes = bincounterdd((vxs, vys, vzs), voxel_sizes)
-    vxs, vys, vzs = voxel_sizes[:, np.newaxis] * vpos
-    return (vxs, vys, vzs, vnes)
+    dxs  = np.random.normal(xs, sqrtz * transverse_diffusion)
+    dys  = np.random.normal(ys, sqrtz * transverse_diffusion)
+    dzs  = np.random.normal(zs, sqrtz * longitudinal_diffusion)
+
+    return (dxs, dys, dzs)
+
+
+#######################################
+########## PHOTON SIMULATION ##########
+#######################################
+
+def generate_s1_photons(energies : np.array,
+                        ws       : float) -> np.array:
+    """ generate s1 photons,
+    """
+    return np.random.poisson(energies / ws)
+
+
+def generate_s2_photons(x              : np.array,
+                        el_gain        : float,
+                        el_gain_sigma  : float) -> np.array:
+    """ generate number of EL-photons produced by secondary electrons that reach
+    the EL (after drift and diffusion)
+    """
+    n = len(x)
+    nphs      = np.random.normal(el_gain, el_gain_sigma, size = n)
+    return nphs
+
+
+def photons_at_sensors(xs        : np.array,
+                       ys        : np.array,
+                       zs        : np.array,
+                       photons   : np.array,
+                       x_sensors : np.array,
+                       y_sensors : np.array,
+                       z_sensors : float,
+                       psf : Callable) -> np.array:
+    """Compute the photons that reach each sensor, based on
+    the sensor psf"""
+
+    dxs = xs[:, np.newaxis] - x_sensors
+    dys = ys[:, np.newaxis] - y_sensors
+    dzs = zs[:, np.newaxis] - z_sensors
+    photons = photons[:, np.newaxis]
+
+    phs = photons * psf(dxs, dys, dzs)
+    phs = np.random.poisson(phs)
+    return phs
+
+
+##################################
+############# PSF ################
+##################################
+def _psf(dx, dy, dz, factor = 1.):
+    """ generic analytic PSF function
+    """
+    return factor * np.abs(dz) / (2 * np.pi) / (dx**2 + dy**2 + dz**2)**1.5
