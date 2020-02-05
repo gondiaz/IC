@@ -10,7 +10,6 @@ from invisible_cities.io.mcinfo_io import read_mchits_df
 #######################################
 ############### SOURCE ################
 #######################################
-
 def load_MC(files_in : List[str]) -> Generator:
     for filename in files_in:
         with tb.open_file(filename) as h5in:
@@ -19,7 +18,7 @@ def load_MC(files_in : List[str]) -> Generator:
             hits_df    = read_mchits_df(h5in, extents)
             for evt in event_ids:
                 hits = hits_df.loc[evt, :, :]
-                yield dict(evt    = evt,
+                yield dict(event_number = evt,
                            x      = hits["x"]     .values,
                            y      = hits["y"]     .values,
                            z      = hits["z"]     .values,
@@ -29,7 +28,6 @@ def load_MC(files_in : List[str]) -> Generator:
 #######################################
 ######### ELECTRON SIMULATION #########
 #######################################
-
 def generate_electrons(energies    : np.array,
                        wi          : float,
                        fano_factor : float ) -> np.array:
@@ -81,10 +79,9 @@ def diffuse_electrons(xs                     : np.array,
 #######################################
 ########## PHOTON SIMULATION ##########
 #######################################
-
 def generate_s1_photons(energies : np.array,
                         ws       : float) -> np.array:
-    """ generate s1 photons,
+    """ generate s1 photons
     """
     return np.random.poisson(energies / ws)
 
@@ -154,12 +151,9 @@ def sample_photons_and_fill_wfs(ts          : np.array,
                                 wfs         : np.array,
                                 wf_bin_time : float,
                                 nsamples    : int):
-
     """ Create the wfs starting from the photons arrived at each sensor.
     The control parameters are the wf_bin_time and the nsamples.
     Returns: waveforms
     """
-
     out = np.array([_wf(ts, iphs, iwf, wf_bin_time, nsamples) for iphs, iwf in zip(phs, wfs)])
-
     return out

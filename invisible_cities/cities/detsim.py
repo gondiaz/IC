@@ -14,7 +14,8 @@ from invisible_cities.dataflow  import dataflow as fl
 
 from invisible_cities.cities    import detsim_functions as fn
 
-from invisible_cities.io.rwf_io import rwf_writer
+from invisible_cities.io.rwf_io           import rwf_writer
+from invisible_cities.io.run_and_event_io import run_and_event_writer
 
 
 
@@ -51,32 +52,26 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     ##########################################
     generate_electrons = fl.map(partial(fn.generate_electrons, wi = wi, fano_factor = fano_factor),
                                 args = ("energy"), out  = ("electrons"))
-
     drift_electrons    = fl.map(partial(fn.drift_electrons, lifetime = lifetime, drift_velocity = drift_velocity),
                                 args = ("z", "electrons"), out  = ("electrons"))
-
-    diffuse_electrons  = fl.map(partial(fn.diffuse_electrons, transverse_diffusion  =transverse_diffusion, longitudinal_diffusion=longitudinal_diffusion),
+    diffuse_electrons  = fl.map(partial(fn.diffuse_electrons, transverse_diffusion = transverse_diffusion, longitudinal_diffusion = longitudinal_diffusion),
                                 args = ( "x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
 
     simulate_electrons = fl.pipe( generate_electrons, drift_electrons, diffuse_electrons )
-
+    
     ############################################
     ############ SIMULATE PHOTONS ##############
     ############################################
     generate_S1_photons = fl.map(partial(fn.generate_s1_photons, ws = ws),
                                  args = ("energy"), out  = ("S1photons"))
-
     generate_S2_photons = fl.map(partial(fn.generate_s2_photons, el_gain = el_gain, el_gain_sigma = el_gain_sigma),
                                  args = ("dx"), out  = ("S2photons"))
-
     S1photons_at_pmts = fl.map(partial(fn.photons_at_sensors, x_sensors = datapmt["X"].values, y_sensors = datapmt["Y"].values, z_sensors = EP_z,
                                                               psf       = S1pmt_psf),
                                args = ("x", "y", "z", "S1photons"), out  = ("S1photons_pmt"))
-
     S2photons_at_pmts = fl.map(partial(fn.photons_at_sensors, x_sensors = datapmt["X"].values, y_sensors = datapmt["Y"].values, z_sensors = 0,
                                                               psf       = S2pmt_psf),
                                args = ("dx", "dy", "dz", "S2photons"), out  = ("S2photons_pmt"))
-
     S2photons_at_sipms= fl.map(partial(fn.photons_at_sensors, x_sensors = datasipm["X"].values, y_sensors = datasipm["Y"].values, z_sensors = 0,
                                                               psf       = S2sipm_psf),
                                args = ("dx", "dy", "dz", "S2photons"), out  = ("S2photons_sipm"))
@@ -92,8 +87,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     ############################
     ### CREATE AND FILL WFS ####
     ############################
-    create_empty_pmt_waveforms  = fl.map(lambda x: np.zeros(  (npmts, wf_pmt_nbins), dtype = int), args=("evt"), out=("pmtwfs"))
-    create_empty_sipm_waveforms = fl.map(lambda x: np.zeros((nsipms, wf_sipm_nbins), dtype = int), args=("evt"), out=("sipmwfs"))
+    create_empty_pmt_waveforms  = fl.map(lambda x: np.zeros(  (npmts, wf_pmt_nbins), dtype = int), args=("event_number"), out=("pmtwfs"))
+    create_empty_sipm_waveforms = fl.map(lambda x: np.zeros((nsipms, wf_sipm_nbins), dtype = int), args=("event_number"), out=("sipmwfs"))
 
 
     fill_S1_pmts = fl.map(partial(fn.sample_photons_and_fill_wfs, wf_bin_time = wf_pmt_bin_time, nsamples = s1_nsamples),
@@ -111,15 +106,15 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
         ######################################
         ############# WRITE WFS ##############
         ######################################
-        pmtwriter  = rwf_writer(h5out, group_name = "RD", table_name = "pmtrwf" , n_sensors = npmts , waveform_length = wf_pmt_nbins)
-        write_pmtwfs  = fl.sink(pmtwriter, args=("pmtwfs"))
-        sipmwriter = rwf_writer(h5out, group_name = "RD", table_name = "sipmrwf", n_sensors = nsipms, waveform_length = wf_sipm_nbins)
-        write_sipmwfs = fl.sink(sipmwriter, args=("sipmwfs"))
+        write_pmtwfs_  = rwf_writer(h5out, group_name = "RD", table_name = "pmtrwf" , n_sensors = npmts , waveform_length = wf_pmt_nbins)
+        write_sipmwfs_ = rwf_writer(h5out, group_name = "RD", table_name = "sipmrwf", n_sensors = nsipms, waveform_length = wf_sipm_nbins)
+        write_pmtwfs  = fl.sink(write_pmtwfs_ , args=("pmtwfs"))
+        write_sipmwfs = fl.sink(write_sipmwfs_, args=("sipmwfs"))
 
         #sinkpipe = fl.sink(lambda x: print(x), args=("evt"))
 
         return fl.push(source=fn.load_MC(files_in),
-                       pipe  = fl.pipe(fl.filter(lambda x: x==0, args=("evt")),
+                       pipe  = fl.pipe(fl.filter(lambda x: x==0, args=("event_number")),
                                        simulate_electrons,
                                        simulate_photons,
                                        S1_buffer_times,
