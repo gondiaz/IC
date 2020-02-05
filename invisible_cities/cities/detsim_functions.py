@@ -118,7 +118,7 @@ def photons_at_sensors(xs        : np.array,
 
     phs = photons * psf(dxs, dys, dzs)
     phs = np.random.poisson(phs)
-    return phs
+    return phs.T
 
 
 ##################################
@@ -137,6 +137,18 @@ def bincounter(xs, dx = 1., x0 = 0.):
     ixs    = ((xs + x0) // dx).astype(int)
     return np.unique(ixs, return_counts=True)
 
+
+def _wf(its, iphs, iwf, wf_bin_time, nsamples):
+    if (np.sum(iphs) <= 0): return iwf
+    isel       = iphs > 0
+    nts        = np.repeat(its[isel], iphs[isel])
+    sits, sphs = bincounter(nts, wf_bin_time)
+    sphsn      = np.random.poisson(sphs/nsamples, size = (nsamples, sphs.size))
+    for kk, kphs in enumerate(sphsn):
+        iwf[sits + kk] = iwf[sits + kk] + kphs
+    return iwf
+
+
 def sample_photons_and_fill_wfs(ts          : np.array,
                                 phs         : np.array,
                                 wfs         : np.array,
@@ -147,16 +159,7 @@ def sample_photons_and_fill_wfs(ts          : np.array,
     The control parameters are the wf_bin_time and the nsamples.
     Returns: waveforms
     """
-    def _wf(its, iphs, iwf):
-        if (np.sum(iphs) <= 0): return iwf
-        isel       = iphs > 0
-        nts        = np.repeat(its[isel], iphs[isel])
-        sits, sphs = bincounter(nts, wf_bin_time)
-        sphsn      = np.random.poisson(sphs/nsamples, size = (nsamples, sphs.size))
-        for kk, kphs in enumerate(sphsn):
-            iwf[sits + kk] = iwf[sits + kk] + kphs
-        return iwf
 
-    [_wf(ts, iphs, iwf) for iphs, iwf in zip(phs.T, wfs.T)]
+    out = np.array([_wf(ts, iphs, iwf, wf_bin_time, nsamples) for iphs, iwf in zip(phs, wfs)])
 
-    return wfs
+    return out

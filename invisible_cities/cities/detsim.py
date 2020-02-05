@@ -10,9 +10,11 @@ import invisible_cities.database.load_db       as db
 
 from invisible_cities.cities.components import city
 
-from invisible_cities.dataflow import dataflow as fl
+from invisible_cities.dataflow  import dataflow as fl
 
-from invisible_cities.cities import detsim_functions as fn
+from invisible_cities.cities    import detsim_functions as fn
+
+from invisible_cities.io.rwf_io import rwf_writer
 
 
 
@@ -90,8 +92,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     ############################
     ### CREATE AND FILL WFS ####
     ############################
-    create_empty_pmt_waveforms  = fl.map(lambda x: np.zeros((wf_pmt_nbins ,  npmts), dtype = int), args=("evt"), out=("pmtwfs"))
-    create_empty_sipm_waveforms = fl.map(lambda x: np.zeros((wf_sipm_nbins, nsipms), dtype = int), args=("evt"), out=("sipmwfs"))
+    create_empty_pmt_waveforms  = fl.map(lambda x: np.zeros(  (npmts, wf_pmt_nbins), dtype = int), args=("evt"), out=("pmtwfs"))
+    create_empty_sipm_waveforms = fl.map(lambda x: np.zeros((nsipms, wf_sipm_nbins), dtype = int), args=("evt"), out=("sipmwfs"))
 
 
     fill_S1_pmts = fl.map(partial(fn.sample_photons_and_fill_wfs, wf_bin_time = wf_pmt_bin_time, nsamples = s1_nsamples),
@@ -101,13 +103,20 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     fill_S2_sipms = fl.map(partial(fn.sample_photons_and_fill_wfs, wf_bin_time = wf_sipm_bin_time, nsamples = s2_sipm_nsamples),
                           args = ("S2_buffer_times", "S2photons_sipm", "sipmwfs"), out=("sipmwfs"))
 
+    convert_pmtwfs_to_adc  = fl.map(lambda x: x*datapmt ["adc_to_pes"].values[:, np.newaxis], args = ("pmtwfs") , out=("pmtwfs"))
+    convert_sipmwfs_to_adc = fl.map(lambda x: x*datasipm["adc_to_pes"].values[:, np.newaxis], args = ("sipmwfs"), out=("sipmwfs"))
 
     with tb.open_file(file_out, "w") as h5out:
 
         ######################################
         ############# WRITE WFS ##############
         ######################################
-        sinkpipe = fl.sink(lambda x: print(x), args=("evt"))
+        pmtwriter  = rwf_writer(h5out, group_name = "RD", table_name = "pmtrwf" , n_sensors = npmts , waveform_length = wf_pmt_nbins)
+        write_pmtwfs  = fl.sink(pmtwriter, args=("pmtwfs"))
+        sipmwriter = rwf_writer(h5out, group_name = "RD", table_name = "sipmrwf", n_sensors = nsipms, waveform_length = wf_sipm_nbins)
+        write_sipmwfs = fl.sink(sipmwriter, args=("sipmwfs"))
+
+        #sinkpipe = fl.sink(lambda x: print(x), args=("evt"))
 
         return fl.push(source=fn.load_MC(files_in),
                        pipe  = fl.pipe(fl.filter(lambda x: x==0, args=("evt")),
@@ -119,7 +128,11 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
                                        create_empty_sipm_waveforms,
                                        fill_S1_pmts,
                                        fill_S2_pmts,
-                                       #fill_S2_sipms,
+                                       fill_S2_sipms,
+                                       convert_pmtwfs_to_adc,
+                                       convert_sipmwfs_to_adc,
                                        fl.spy(print),
-                                       sinkpipe),
+                                       fl.fork(write_pmtwfs,
+                                               write_sipmwfs)),
+                                       #sinkpipe),
                         result = ())
