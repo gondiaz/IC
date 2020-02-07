@@ -55,7 +55,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     drift_electrons    = fl.map(partial(fn.drift_electrons, lifetime = lifetime, drift_velocity = drift_velocity),
                                 args = ("z", "electrons"), out  = ("electrons"))
     diffuse_electrons  = fl.map(partial(fn.diffuse_electrons, transverse_diffusion = transverse_diffusion, longitudinal_diffusion = longitudinal_diffusion),
-                                args = ( "x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
+                                args = ("x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
 
     simulate_electrons = fl.pipe( generate_electrons, drift_electrons, diffuse_electrons )
 

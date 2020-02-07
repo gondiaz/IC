@@ -139,10 +139,14 @@ def create_waveform(times   : np.array,
                     photons : np.array,
                     bins    : np.array,
                     wf_bin_time : float,
-                    nsamples    : float):
+                    nsamples    : float) -> np.array:
     wf   = np.zeros(len(bins))
 
-    t = np.repeat(times, photons)
+    if np.sum(photons)==0:
+        return wf
+
+    sel = photons>0
+    t = np.repeat(times[sel], photons[sel])
     t = np.clip  (t, 0, bins[-nsamples])
     indexes, counts = bincounter(t, wf_bin_time)
 
@@ -158,7 +162,7 @@ def create_sensor_waveforms(times   : np.array,
                             wf_buffer_time : float,
                             wf_bin_time    : float,
                             nsamples : float,
-                            poisson  : bool=False):
+                            poisson  : bool=False) -> np.array:
     bins = np.arange(0, wf_buffer_time, wf_bin_time)
     wfs = np.array([create_waveform(times, phs, bins, wf_bin_time, nsamples) for phs in photons])
 
