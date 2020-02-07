@@ -135,25 +135,58 @@ def bincounter(xs, dx = 1., x0 = 0.):
     return np.unique(ixs, return_counts=True)
 
 
-def _wf(its, iphs, iwf, wf_bin_time, nsamples):
-    if (np.sum(iphs) <= 0): return iwf
-    isel       = iphs > 0
-    nts        = np.repeat(its[isel], iphs[isel])
-    sits, sphs = bincounter(nts, wf_bin_time)
-    sphsn      = np.random.poisson(sphs/nsamples, size = (nsamples, sphs.size))
-    for kk, kphs in enumerate(sphsn):
-        iwf[sits + kk] = iwf[sits + kk] + kphs
-    return iwf
+def create_waveform(times   : np.array,
+                    photons : np.array,
+                    bins    : np.array,
+                    wf_bin_time : float,
+                    nsamples    : float):
+    wf   = np.zeros(len(bins))
+
+    t = np.repeat(times, photons)
+    t = np.clip  (t, 0, bins[-nsamples])
+    indexes, counts = bincounter(t, wf_bin_time)
+
+    spread_photons = np.repeat(counts[:, np.newaxis]/nsamples, nsamples, axis=1)
+    for index, counts in zip(indexes, spread_photons):
+        wf[index:index+nsamples] = wf[index:index+nsamples] + counts
+
+    return wf
 
 
-def sample_photons_and_fill_wfs(ts          : np.array,
-                                phs         : np.array,
-                                wfs         : np.array,
-                                wf_bin_time : float,
-                                nsamples    : int):
-    """ Create the wfs starting from the photons arrived at each sensor.
-    The control parameters are the wf_bin_time and the nsamples.
-    Returns: waveforms
-    """
-    out = np.array([_wf(ts, iphs, iwf, wf_bin_time, nsamples) for iphs, iwf in zip(phs, wfs)])
-    return out
+def create_sensor_waveforms(times   : np.array,
+                            photons : np.array,
+                            wf_buffer_time : float,
+                            wf_bin_time    : float,
+                            nsamples : float,
+                            poisson  : bool=False):
+    bins = np.arange(0, wf_buffer_time, wf_bin_time)
+    wfs = np.array([create_waveform(times, phs, bins, wf_bin_time, nsamples) for phs in photons])
+
+    if poisson:
+        wfs = np.random.poisson(wfs)
+
+    return wfs
+
+
+# def _wf(its, iphs, iwf, wf_bin_time, nsamples):
+#     if (np.sum(iphs) <= 0): return iwf
+#     isel       = iphs > 0
+#     nts        = np.repeat(its[isel], iphs[isel])
+#     sits, sphs = bincounter(nts, wf_bin_time)
+#     sphsn      = np.random.poisson(sphs/nsamples, size = (nsamples, sphs.size))
+#     for kk, kphs in enumerate(sphsn):
+#         iwf[sits + kk] = iwf[sits + kk] + kphs
+#     return iwf
+#
+#
+# def sample_photons_and_fill_wfs(ts          : np.array,
+#                                 phs         : np.array,
+#                                 wfs         : np.array,
+#                                 wf_bin_time : float,
+#                                 nsamples    : int):
+#     """ Create the wfs starting from the photons arrived at each sensor.
+#     The control parameters are the wf_bin_time and the nsamples.
+#     Returns: waveforms
+#     """
+#     out = np.array([_wf(ts, iphs, iwf, wf_bin_time, nsamples) for iphs, iwf in zip(phs, wfs)])
+#     return out
