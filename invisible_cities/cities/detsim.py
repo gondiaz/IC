@@ -33,9 +33,14 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     npmts  = len(datapmt)
     nsipms = len(datasipm)
 
-    S2pmt_psf  = partial(fn._psf, factor=1e5)
-    S2sipm_psf = partial(fn._psf, factor=1e5)
+    nphotons = (41.5 * units.keV / wi) * el_gain * npmts
+
+    # S2pmt_psf  = partial(fn._psf, factor=1e5)
+    # S2sipm_psf = partial(fn._psf, factor=1e5)
+    # S1pmt_psf  = partial(fn._psf, factor=1e5)
     S1pmt_psf  = partial(fn._psf, factor=1e5)
+    S2pmt_psf  = fn.get_psf_from_krmap(krmap_filename, factor=1./nphotons)
+    S2sipm_psf = fn.get_sipm_psf_from_file(psfsipm_filename)
 
     el_gain_sigma = np.sqrt(el_gain * conde_policarpo_factor)
     EL_dtime      =  EL_dz / drift_velocity
@@ -57,7 +62,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
     diffuse_electrons  = fl.map(partial(fn.diffuse_electrons, transverse_diffusion = transverse_diffusion, longitudinal_diffusion = longitudinal_diffusion),
                                 args = ("x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
 
-    simulate_electrons = fl.pipe( generate_electrons, drift_electrons, diffuse_electrons )
+    simulate_electrons = fl.pipe(generate_electrons, drift_electrons, diffuse_electrons)
 
     ############################################
     ############ SIMULATE PHOTONS ##############
@@ -105,8 +110,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
 
     add_pmt_wfs = fl.map(lambda x, y: x + y, args=("S1pmtwfs", "S2pmtwfs"), out=("pmtwfs"))
 
-    convert_pmtwfs_to_adc  = fl.map(lambda x: x*datapmt ["adc_to_pes"].values[:, np.newaxis], args = ("pmtwfs") , out=("pmtwfs"))
-    convert_sipmwfs_to_adc = fl.map(lambda x: x*datasipm["adc_to_pes"].values[:, np.newaxis], args = ("sipmwfs"), out=("sipmwfs"))
+    # convert_pmtwfs_to_adc  = fl.map(lambda x: x*datapmt ["adc_to_pes"].values[:, np.newaxis], args = ("pmtwfs") , out=("pmtwfs"))
+    # convert_sipmwfs_to_adc = fl.map(lambda x: x*datasipm["adc_to_pes"].values[:, np.newaxis], args = ("sipmwfs"), out=("sipmwfs"))
 
     with tb.open_file(file_out, "w") as h5out:
 
@@ -119,7 +124,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
         write_sipmwfs = fl.sink(write_sipmwfs_, args=("sipmwfs"))
 
         return fl.push(source=fn.load_MC(files_in),
-                       pipe  = fl.pipe(fl.filter(lambda x: x==0, args=("event_number")),
+                       pipe  = fl.pipe(fl.slice(*event_range, close_all=True),
                                        simulate_electrons,
                                        simulate_photons,
                                        S1_buffer_times,
@@ -130,8 +135,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, krmap_filen
                                        fill_S2_pmts,
                                        fill_S2_sipms,
                                        add_pmt_wfs,
-                                       convert_pmtwfs_to_adc,
-                                       convert_sipmwfs_to_adc,
+                                       # convert_pmtwfs_to_adc,
+                                       # convert_sipmwfs_to_adc,
                                        fl.spy(print),
                                        fl.fork(write_pmtwfs,
                                                write_sipmwfs)),
