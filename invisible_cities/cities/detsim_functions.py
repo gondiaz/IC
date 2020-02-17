@@ -57,7 +57,7 @@ def diffuse_electrons(xs                     : np.array,
                       ys                     : np.array,
                       zs                     : np.array,
                       electrons              : np.array,
-                      transverse_diffusion   : float,
+                      transversal_diffusion   : float,
                       longitudinal_diffusion : float)\
                       -> Tuple[np.array, np.array, np.array, np.array]:
     """
@@ -70,8 +70,8 @@ def diffuse_electrons(xs                     : np.array,
     zs = np.repeat(zs, electrons.astype(int))
 
     sqrtz = zs ** 0.5
-    dxs  = np.random.normal(xs, sqrtz * transverse_diffusion)
-    dys  = np.random.normal(ys, sqrtz * transverse_diffusion)
+    dxs  = np.random.normal(xs, sqrtz * transversal_diffusion)
+    dys  = np.random.normal(ys, sqrtz * transversal_diffusion)
     dzs  = np.random.normal(zs, sqrtz * longitudinal_diffusion)
 
     return (dxs, dys, dzs)
@@ -98,14 +98,14 @@ def generate_s2_photons(x              : np.array,
     return nphs
 
 
-def photons_at_sensors(xs         : np.array,
-                       ys         : np.array,
-                       zs         : np.array,
-                       photons    : np.array,
-                       x_sensors  : np.array,
-                       y_sensors  : np.array,
-                       z_sensors  : float   ,
-                       psf : Callable) -> np.array:
+def pes_at_sensors(xs         : np.array,
+                   ys         : np.array,
+                   zs         : np.array,
+                   photons    : np.array,
+                   x_sensors  : np.array,
+                   y_sensors  : np.array,
+                   z_sensors  : float   ,
+                   psf : Callable) -> np.array:
     """Compute the photons that reach each sensor, based on
     the sensor psf"""
 
@@ -114,9 +114,9 @@ def photons_at_sensors(xs         : np.array,
     dzs = zs[:, np.newaxis] - z_sensors
     photons = photons[:, np.newaxis]
 
-    phs = photons * psf(dxs, dys, dzs)
-    phs = np.random.poisson(phs)
-    return phs.T
+    pes = photons * psf(dxs, dys, dzs)
+    pes = np.random.poisson(pes)
+    return pes.T
 
 
 ##################################
