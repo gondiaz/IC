@@ -500,7 +500,11 @@ def get_peak_s2_energy(peak, pmt_ids):
 
 def hit_builder(dbfile, run_number, drift_v, reco,
                 rebin_slices, rebin_method,
-                charge_type = SiPMCharge.raw):
+                charge_type = SiPMCharge.raw,
+                pmt_ids = "all"):
+    datapmt = load_db.DataPMT(dbfile, run_number)
+    if pmt_ids == "all": pmt_ids = datapmt.index.values
+
     datasipm = load_db.DataSiPM(dbfile, run_number)
     sipm_xs  = datasipm.X.values
     sipm_ys  = datasipm.Y.values
@@ -554,10 +558,18 @@ def hit_builder(dbfile, run_number, drift_v, reco,
             sipm_charge = peak.sipm_charge_array(sipm_noise        ,
                                                  charge_type       ,
                                                  single_point=False)
+            s2_pmts = peak.pmts.all_waveforms
+            c = np.zeros(s2_pmts.shape[0])
+            c[pmt_ids] = 1
+            # sel_s2 = np.multiply(c, s2_pmts.T).T
+            sel_s2 = c[:, np.newaxis]*s2_pmts
+            sel_s2 = np.sum(sel_s2, axis=0)
+
             for slice_no, (t_slice, qs) in enumerate(zip(peak.times ,
                                                          sipm_charge)):
                 z_slice = (t_slice - s1_t) * units.ns * drift_v
-                e_slice = peak.pmts.sum_over_sensors[slice_no]
+                # e_slice = peak.pmts.sum_over_sensors[slice_no]
+                e_slice = sel_s2[slice_no]
                 try:
                     xys      = sipm_xys[peak.sipms.ids]
                     clusters = reco(xys, qs)

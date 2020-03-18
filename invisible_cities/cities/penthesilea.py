@@ -58,7 +58,8 @@ def penthesilea(files_in, file_out, compression, event_range, print_mod, detecto
                 slice_reco_params  = dict(),
                 global_reco_params = dict(),
                 rebin_method       = 'stride',
-                sipm_charge_type   = 'raw'):
+                sipm_charge_type   = 'raw',
+                pmt_ids = "all"):
     #  slice_reco_params are qth, qlm, lm_radius, new_lm_radius, msipm used for hits reconstruction
     # global_reco_params are qth, qlm, lm_radius, new_lm_radius, msipm used for overall global (pointlike event) reconstruction
 
@@ -71,7 +72,7 @@ def penthesilea(files_in, file_out, compression, event_range, print_mod, detecto
     pmap_select           = df.count_filter(bool, args="pmap_passed")
 
     reco_algo_slice       = compute_xy_position(detector_db, run_number, **slice_reco_params)
-    build_hits            = df.map(hit_builder(detector_db, run_number, drift_v, reco_algo_slice, rebin, RebinMethod[rebin_method], SiPMCharge[sipm_charge_type]),
+    build_hits            = df.map(hit_builder(detector_db, run_number, drift_v, reco_algo_slice, rebin, RebinMethod[rebin_method], SiPMCharge[sipm_charge_type], pmt_ids=pmt_ids),
                                    args = ("pmap", "selector_output", "event_number", "timestamp"),
                                    out  = "hits"                                                 )
     reco_algo_global      = compute_xy_position(detector_db, run_number, **global_reco_params)
