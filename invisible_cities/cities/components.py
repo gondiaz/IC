@@ -425,7 +425,11 @@ def compute_z_and_dt(t_s2, t_s1, drift_v):
 
 
 def build_pointlike_event(dbfile, run_number, drift_v,
-                          reco, charge_type = SiPMCharge.raw):
+                          reco, charge_type = SiPMCharge.raw,
+                          pmt_ids = "all"):
+    datapmt = load_db.DataPMT(dbfile, run_number)
+    if pmt_ids == "all": pmt_ids = datapmt.index.values
+
     datasipm   = load_db.DataSiPM(dbfile, run_number)
     sipm_xs    = datasipm.X.values
     sipm_ys    = datasipm.Y.values
@@ -454,7 +458,8 @@ def build_pointlike_event(dbfile, run_number, drift_v,
             evt.nS2 += 1
             evt.S2w.append(peak.width / units.mus)
             evt.S2h.append(peak.height)
-            evt.S2e.append(peak.total_energy)
+            # evt.S2e.append(peak.total_energy)
+            evt.S2e.append(get_peak_s2_energy(peak, pmt_ids))
             evt.S2t.append(peak.time_at_max_energy)
 
             xys = sipm_xys[peak.sipms.ids           ]
@@ -487,6 +492,10 @@ def build_pointlike_event(dbfile, run_number, drift_v,
         return evt
 
     return build_pointlike_event
+
+def get_peak_s2_energy(peak, pmt_ids):
+     s2_pmts = peak.pmts.all_waveforms
+     return np.sum(s2_pmts[pmt_ids])
 
 
 def hit_builder(dbfile, run_number, drift_v, reco,
