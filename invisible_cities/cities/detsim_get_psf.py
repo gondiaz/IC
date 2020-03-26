@@ -49,7 +49,6 @@ def binedges_from_bincenters(bincenters):
     d = ds[0]
     return np.arange(bincenters[0]-d/2., bincenters[-1]+d/2.+d, d)
 
-
 ##################################
 ############# PSF ################
 ##################################
@@ -57,24 +56,6 @@ def _psf(dx, dy, dz, factor = 1.):
     """ generic analytic PSF function
     """
     return factor * np.abs(dz) / (2 * np.pi) / (dx**2 + dy**2 + dz**2)**1.5
-
-
-def get_psf_from_krmap(filename : str,
-                       factor   : float = 1.)->Callable:
-    """ reads KrMap and generate a psf function with the E0-map
-    """
-    maps = read_maps(filename)
-    xmin, xmax, ymin, ymax, nx, ny, _ = maps.mapinfo.values
-    dx   = (xmax - xmin)/ float(nx)
-    dy   = (ymax - ymin)/ float(ny)
-    e0map  = factor * np.nan_to_num(np.array(maps.e0), 0.)
-
-    xbins = np.arange(xmin, xmax+dx, dx)
-    ybins = np.arange(ymin, ymax+dy, dy)
-    zbins = np.array([0, 1])
-
-    H = e0map[:, :, np.newaxis]
-    return create_xyz_function(H, [xbins, ybins, zbins])
 
 
 def get_sipm_psf_from_file(filename : str)->Callable:
@@ -102,23 +83,36 @@ def get_sipm_psf_from_file(filename : str)->Callable:
 ##################################
 ######### LIGTH TABLE ############
 ##################################
-def get_ligthtables(filename: str)->Callable:
+def get_ligthtables(filename: str,
+                    signal  : str)->Callable:
     ##### Load LT ######
     with tb.open_file(filename) as h5file:
         LT = h5file.root.LightTable.table.read()
 
-    #### XYZ binning #####
-    x, y, z = LT["x"], LT["y"], LT["z"]
+    if signal == "S1":
+        #### XYZ binning #####
+        x, y, z = LT["x"], LT["y"], LT["z"]
 
-    xcenters, ycenters, zcenters = np.unique(x), np.unique(y), np.unique(z)
-    xbins = binedges_from_bincenters(xcenters)
-    ybins = binedges_from_bincenters(ycenters)
-    zbins = binedges_from_bincenters(zcenters)
-    bins  = [xbins, ybins, zbins]
+        xcenters, ycenters, zcenters = np.unique(x), np.unique(y), np.unique(z)
+        xbins = binedges_from_bincenters(xcenters)
+        ybins = binedges_from_bincenters(ycenters)
+        zbins = binedges_from_bincenters(zcenters)
+        bins  = [xbins, ybins, zbins]
+    elif signal == "S2":
+        #### XYZ binning #####
+        x, y = LT["x"], LT["y"]
+        z    = np.zeros(len(x))
+
+        xcenters, ycenters = np.unique(x), np.unique(y)
+        xbins = binedges_from_bincenters(xcenters)
+        ybins = binedges_from_bincenters(ycenters)
+        zbins = np.array([0, 1])
+        bins  = [xbins, ybins, zbins]
 
     ###### CREATE XYZ FUNCTION FOR EACH SENSOR ######
     func_per_sensor = []
-    sensors = ["FIBER_SENSOR_10000", "FIBER_SENSOR_10001"]
+    # sensors = ["FIBER_SENSOR_10000", "FIBER_SENSOR_10001"]
+    sensors = [f"PmtR11410_{i}" for i in range(0, 12)]
     for sensor in sensors:
         w = LT[sensor]
 
@@ -130,7 +124,36 @@ def get_ligthtables(filename: str)->Callable:
     ###### CREATE XYZ CALLABLE FOR LIST OF XYZ FUNCTIONS #####
     def merge_list_of_functions(list_of_functions):
         def merged(x, y, z):
-            return [f(x, y, z) for f in list_of_functions]
+            return np.array([f(x, y, z) for f in list_of_functions]).T
         return merged
+    return merge_list_of_functions(func_per_sensor)
 
+
+def get_krmaps_as_ligthtables(filenames : str,
+                              factor    : float = 1.)->Callable:
+    """ reads KrMap and generate a psf function with the E0-map
+    """
+    func_per_sensor = []
+    for filename in filenames:
+        maps = read_maps(filename)
+        xmin, xmax, ymin, ymax, nx, ny, _ = maps.mapinfo.values
+        dx   = (xmax - xmin)/ float(nx)
+        dy   = (ymax - ymin)/ float(ny)
+        e0map  = factor * np.nan_to_num(np.array(maps.e0), 0.)
+
+        xbins = np.arange(xmin, xmax+dx, dx)
+        ybins = np.arange(ymin, ymax+dy, dy)
+        zbins = np.array([0, 1])
+        bins = [xbins, ybins, zbins]
+
+        H = e0map[:, :, np.newaxis]
+        fxyz = create_xyz_function(H, bins)
+
+        func_per_sensor.append(fxyz)
+
+    ###### CREATE XYZ CALLABLE FOR LIST OF XYZ FUNCTIONS #####
+    def merge_list_of_functions(list_of_functions):
+        def merged(x, y, z):
+            return np.array([f(x, y, z) for f in list_of_functions]).T
+        return merged
     return merge_list_of_functions(func_per_sensor)
