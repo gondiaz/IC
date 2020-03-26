@@ -27,18 +27,23 @@ def pes_at_sensors(xs         : np.ndarray,
                    ys         : np.ndarray,
                    zs         : np.ndarray,
                    photons    : np.ndarray,
-                   x_sensors  : np.ndarray,
-                   y_sensors  : np.ndarray,
-                   z_sensors  : float   ,
-                   psf : Callable) -> np.ndarray:
+                   LT         : Callable   = None,
+                   psf        : Callable   = None,
+                   x_sensors  : np.ndarray = None,
+                   y_sensors  : np.ndarray = None,
+                   z_sensors  : np.ndarray = None) -> np.ndarray:
     """compute the pes that reach each sensor, based on
     the sensor psf"""
 
-    dxs = xs[:, np.newaxis] - x_sensors
-    dys = ys[:, np.newaxis] - y_sensors
-    dzs = zs[:, np.newaxis] - z_sensors
-    photons = photons[:, np.newaxis]
+    if psf:
+        dxs = xs[:, np.newaxis] - x_sensors
+        dys = ys[:, np.newaxis] - y_sensors
+        dzs = zs[:, np.newaxis] - z_sensors
 
-    pes = photons * psf(dxs, dys, dzs)
-    pes = np.random.poisson(pes)
+        pes = photons[:, np.newaxis] * psf(dxs, dys, dzs)
+        pes = np.random.poisson(pes)
+    elif LT:
+        pes = photons[:, np.newaxis] * LT(xs, ys, zs)
+        pes = np.random.poisson(pes)
+
     return pes.T
