@@ -74,9 +74,9 @@ def create_sensor_waveforms(signal_type   : str,
             wfs = np.stack([create_waveform(time, bins) for time in times])
             return wfs
     elif signal_type=="S2":
-        def create_sensor_waveforms_(times          : np.ndarray,
-                                     pes_at_sensors : np.ndarray,
-                                     nsamples       : int):
+        def create_sensor_waveforms_(nsamples       : int,
+                                     times          : np.ndarray,
+                                     pes_at_sensors : np.ndarray):
             wfs = np.stack([create_waveform(times, bins, pes, nsamples) for pes in pes_at_sensors])
             return wfs
     else:
