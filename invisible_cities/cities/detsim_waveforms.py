@@ -1,5 +1,7 @@
 import numpy as np
 
+from typing import Callable
+
 from invisible_cities.core.core_functions import in_range
 
 ##################################
@@ -52,12 +54,10 @@ def create_waveform(times    : np.ndarray,
     return wf[:len(bins)-1]
 
 
-def create_sensor_waveforms(wf_buffer_time : float,
-                            bin_width      : float,
-                            signal_type    : str,
-                            times          : np.ndarray,
-                            pes_at_sensors : np.ndarray = None,
-                            nsamples       : int = None) -> np.ndarray:
+
+def create_sensor_waveforms(signal_type   : str,
+                            wf_buffer_time: float,
+                            bin_width     : float) -> Callable:
     """
     This function calls recursively to create_waveform. See create_waveform for
     an explanation of the arguments not explained below.
@@ -67,18 +67,50 @@ def create_sensor_waveforms(wf_buffer_time : float,
     as pes argument in create_waveform but for each sensor in axis 0.
     wf_buffer_time: a float with the waveform extent (in default IC units)
     bin_width: a float with the time distance between bins in the waveform buffer.
-    poisson: a bool. This must be set to True to poisson distribute each bin count.
     """
-
     bins = np.arange(0, wf_buffer_time + bin_width, bin_width)
-    if signal_type == "S1":
-        wfs = np.stack([create_waveform(time, bins) for time in times])
+    if signal_type=="S1":
+        def create_sensor_waveforms_(times : list):
+            wfs = np.stack([create_waveform(time, bins) for time in times])
+            return wfs
+    elif signal_type=="S2":
+        def create_sensor_waveforms_(times          : np.ndarray,
+                                     pes_at_sensors : np.ndarray,
+                                     nsamples       : int):
+            wfs = np.stack([create_waveform(times, bins, pes, nsamples) for pes in pes_at_sensors])
+            return wfs
+    else:
+        ValueError("signal_type must be one of S1 or S1")
 
-    if signal_type == "S2":
-        if not np.any(pes_at_sensors):
-            raise ValueError("pes_at_sensors must be specified for S2 signal type")
-        if not nsamples:
-            raise ValueError("nsamples must be specified for S2 signal type")
-        wfs = np.stack([create_waveform(times, bins, pes, nsamples) for pes in pes_at_sensors])
+    return create_sensor_waveforms_
 
-    return wfs
+
+# def create_sensor_waveforms(wf_buffer_time : float,
+#                             bin_width      : float,
+#                             signal_type    : str,
+#                             times          : np.ndarray,
+#                             pes_at_sensors : np.ndarray = None,
+#                             nsamples       : int = None) -> np.ndarray:
+#     """
+#     This function calls recursively to create_waveform. See create_waveform for
+#     an explanation of the arguments not explained below.
+#
+#     Input:
+#     pes_at_sensors: an array with size (#sensors, len(times)). It is the same
+#     as pes argument in create_waveform but for each sensor in axis 0.
+#     wf_buffer_time: a float with the waveform extent (in default IC units)
+#     bin_width: a float with the time distance between bins in the waveform buffer.
+#     """
+#
+#     bins = np.arange(0, wf_buffer_time + bin_width, bin_width)
+#     if signal_type == "S1":
+#         wfs = np.stack([create_waveform(time, bins) for time in times])
+#
+#     if signal_type == "S2":
+#         if not np.any(pes_at_sensors):
+#             raise ValueError("pes_at_sensors must be specified for S2 signal type")
+#         if not nsamples:
+#             raise ValueError("nsamples must be specified for S2 signal type")
+#         wfs = np.stack([create_waveform(times, bins, pes, nsamples) for pes in pes_at_sensors])
+#
+#     return wfs
