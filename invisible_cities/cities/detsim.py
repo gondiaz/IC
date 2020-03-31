@@ -42,8 +42,6 @@ def get_derived_parameters(detector_db, run_number,
     ########################
     datapmt  = db.DataPMT (detector_db, run_number)
     datasipm = db.DataSiPM(detector_db, run_number)
-    npmts  = len(datapmt)
-    nsipms = len(datasipm)
 
     # nphotons = (41.5 * units.keV / wi) * el_gain * npmts
 
@@ -89,36 +87,38 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
 
     drift_electrons_ = partial(drift_electrons, lifetime = lifetime, drift_velocity = drift_velocity)
     drift_electrons_ = fl.map(drift_electrons_, args = ("z", "electrons"), out  = ("electrons"))
+    count_electrons  = fl.map(lambda x: np.sum(x), args=("electrons"), out=("nes"))
 
     diffuse_electrons_ = partial(diffuse_electrons, transverse_diffusion = transverse_diffusion, longitudinal_diffusion = longitudinal_diffusion)
     diffuse_electrons_ = fl.map(diffuse_electrons_, args = ("x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
 
-    simulate_electrons = fl.pipe(generate_electrons_, drift_electrons_, diffuse_electrons_)
+    simulate_electrons = fl.pipe(generate_electrons_, drift_electrons_, count_electrons, diffuse_electrons_)
 
     ############################################
     ############ SIMULATE PHOTONS ##############
     ############################################
+    # S1#
     generate_S1_photons = partial(generate_s1_photons, ws = ws)
     generate_S1_photons = fl.map(generate_S1_photons, args = ("energy"), out  = ("S1photons"))
 
-    generate_S2_photons = partial(generate_s2_photons, el_gain = el_gain, el_gain_sigma = el_gain_sigma)
-    generate_S2_photons = fl.map(generate_S2_photons, args = ("dx"), out  = ("S2photons"))
-
     S1pes_at_pmts = partial(pes_at_sensors, LT = S1_LT)
-    S1pes_at_pmts = fl.map(S1pes_at_pmts, args = ("x", "y", "z", "S1photons"), out  = ("S1pes_pmt"))
+    S1pes_at_pmts = fl.map(S1pes_at_pmts, args = ("x", "y", "S1photons", "z"), out  = ("S1pes_pmt"))
+
+    # S2 #
+    generate_S2_photons = partial(generate_s2_photons, el_gain = el_gain, el_gain_sigma = el_gain_sigma)
+    generate_S2_photons = fl.map(generate_S2_photons, args = ("nes"), out  = ("S2photons"))
 
     S2pes_at_pmts = partial(pes_at_sensors, LT = S2_LT)
-    S2pes_at_pmts = fl.map(S2pes_at_pmts, args = ("dx", "dy", "dz", "S2photons"), out  = ("S2pes_pmt"))
+    S2pes_at_pmts = fl.map(S2pes_at_pmts, args = ("dx", "dy", "S2photons"), out  = ("S2pes_pmt"))
 
-    S2pes_at_sipms = partial(pes_at_sensors, x_sensors = datasipm["X"].values, y_sensors = datasipm["Y"].values, z_sensors = np.zeros(len(datasipm)), psf = S2sipm_psf)
-    S2pes_at_sipms= fl.map(S2pes_at_sipms,args = ("dx", "dy", "dz", "S2photons"), out  = ("S2pes_sipm"))
+    S2pes_at_sipms = partial(pes_at_sensors, x_sensors = datasipm["X"].values, y_sensors = datasipm["Y"].values, psf = S2sipm_psf)
+    S2pes_at_sipms = fl.map(S2pes_at_sipms, args = ("dx", "dy", "S2photons"), out  = ("S2pes_sipm"))
 
     simulate_photons = fl.pipe(generate_S1_photons, S1pes_at_pmts, generate_S2_photons, S2pes_at_pmts, S2pes_at_sipms)
 
     ############################
     ###### BUFFER TIMES ########
     ############################
-
     def generate_S1_time(size=1):
         r = []
         for i in range(size):
@@ -146,12 +146,13 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     fill_S1_pmts = fl.map(create_S1_waveform, args = ("S1_buffer_times"), out=("S1pmtwfs"))
 
     create_S2pmt_waveforms = create_sensor_waveforms("S2", wf_buffer_time, wf_pmt_bin_time)
-    fill_S2_pmts  = fl.map(partial(create_S2pmt_waveforms, nsamples = s2_pmt_nsamples) , args = ("S2_buffer_times", "S2pes_pmt"), out=("S2pmtwfs"))
+    fill_S2_pmts  = fl.map(partial(create_S2pmt_waveforms, s2_pmt_nsamples), args = ("S2_buffer_times", "S2pes_pmt"), out=("S2pmtwfs"))
 
     create_S2sipm_waveforms = create_sensor_waveforms("S2", wf_buffer_time, wf_sipm_bin_time)
-    fill_S2_sipms = fl.map(partial(create_S2sipm_waveforms, nsamples = s2_sipm_nsamples), args = ("S2_buffer_times", "S2pes_sipm"), out=("sipmwfs"))
+    fill_S2_sipms = fl.map(partial(create_S2sipm_waveforms, s2_sipm_nsamples), args = ("S2_buffer_times", "S2pes_sipm"), out=("sipmwfs"))
 
     add_pmt_wfs = fl.map(lambda x, y: x + y, args=("S1pmtwfs", "S2pmtwfs"), out=("pmtwfs"))
+
 
     with tb.open_file(file_out, "w") as h5out:
 
@@ -167,6 +168,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
                        pipe  = fl.pipe(fl.slice(*event_range, close_all=True),
                                        simulate_electrons,
                                        simulate_photons,
+                                       # fl.spy(lambda d: print(np.sum(d["S2pes_pmt"]))),
                                        S1times_,
                                        S1_buffer_times,
                                        S2_buffer_times,
@@ -174,7 +176,6 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
                                        fill_S2_pmts,
                                        fill_S2_sipms,
                                        add_pmt_wfs,
-                                       fl.spy(print),
                                        fl.fork(write_pmtwfs,
                                                write_sipmwfs)),
                         result = ())
