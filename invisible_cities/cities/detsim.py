@@ -159,16 +159,19 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
         ######################################
         ############# WRITE WFS ##############
         ######################################
-        write_pmtwfs_  = rwf_writer(h5out, group_name = "RD", table_name = "pmtrwf" , n_sensors = len(datapmt) , waveform_length = int(wf_buffer_time // wf_pmt_bin_time))
-        write_sipmwfs_ = rwf_writer(h5out, group_name = "RD", table_name = "sipmrwf", n_sensors = len(datasipm), waveform_length = int(wf_buffer_time // wf_sipm_bin_time))
-        write_pmtwfs  = fl.sink(write_pmtwfs_ , args=("pmtwfs"))
-        write_sipmwfs = fl.sink(write_sipmwfs_, args=("sipmwfs"))
+        write_pmtwfs  = rwf_writer(h5out, group_name = None, table_name = "pmtrd" , n_sensors = len(datapmt) , waveform_length = int(wf_buffer_time // wf_pmt_bin_time))
+        write_sipmwfs = rwf_writer(h5out, group_name = None, table_name = "sipmrd", n_sensors = len(datasipm), waveform_length = int(wf_buffer_time // wf_sipm_bin_time))
+        write_pmtwfs  = fl.sink(write_pmtwfs, args=("pmtwfs"))
+        write_sipmwfs = fl.sink(write_sipmwfs, args=("sipmwfs"))
+
+        write_run_event = partial(run_and_event_writer(h5out), run_number, timestamp=0)
+        write_run_event = fl.sink(write_run_event, args=("event_number"))
 
         return fl.push(source=load_MC(files_in),
                        pipe  = fl.pipe(fl.slice(*event_range, close_all=True),
                                        simulate_electrons,
                                        simulate_photons,
-                                       # fl.spy(lambda d: print(np.sum(d["S2pes_pmt"]))),
+                                       # fl.spy(lambda d: [print(k) for k in d]),
                                        S1times_,
                                        S1_buffer_times,
                                        S2_buffer_times,
@@ -177,5 +180,6 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
                                        fill_S2_sipms,
                                        add_pmt_wfs,
                                        fl.fork(write_pmtwfs,
-                                               write_sipmwfs)),
+                                               write_sipmwfs,
+                                               write_run_event)),
                         result = ())
