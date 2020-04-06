@@ -33,9 +33,8 @@ from invisible_cities.cities.detsim_get_psf            import get_krmaps_as_ligt
 
 
 def get_derived_parameters(detector_db, run_number,
-                           s1_ligthtable, s2_ligthtable, psfsipm_filename,
-                           wi, el_gain, conde_policarpo_factor, EL_dz,
-                           drift_velocity_EL,
+                           s1_ligthtable, s2_ligthtable, psfsipm_filename, sipm_photons_to_pes,
+                           wi, el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
                            wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time):
     ########################
     ######## Globals #######
@@ -49,7 +48,7 @@ def get_derived_parameters(detector_db, run_number,
     # S2pmt_psf  = fn.get_psf_from_krmap     (krmap_filename, factor=1./nphotons)
     S1_LT = get_ligthtables(s1_ligthtable, "S1")
     S2_LT = get_ligthtables(s2_ligthtable, "S2")
-    S2sipm_psf = get_sipm_psf_from_file(psfsipm_filename)
+    S2sipm_psf = get_sipm_psf_from_file(psfsipm_filename, factor = sipm_photons_to_pes)
 
     el_gain_sigma = np.sqrt(el_gain * conde_policarpo_factor)
     EL_dtime      =  EL_dz / drift_velocity_EL
@@ -66,7 +65,7 @@ def get_derived_parameters(detector_db, run_number,
 @city
 def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, psfsipm_filename,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
-           el_gain, conde_policarpo_factor, EP_z, EL_dz, drift_velocity_EL,
+           el_gain, conde_policarpo_factor, EP_z, EL_dz, drift_velocity_EL, sipm_photons_to_pes,
            wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time):
     ########################
     ######## Globals #######
@@ -75,8 +74,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     S1_LT, S2_LT, S2sipm_psf,\
     el_gain_sigma,\
     s2_pmt_nsamples, s2_sipm_nsamples = get_derived_parameters(detector_db, run_number,
-                                                               s1_ligthtable, s2_ligthtable, psfsipm_filename,
-                                                               wi, el_gain, conde_policarpo_factor, EL_dz, drift_velocity,
+                                                               s1_ligthtable, s2_ligthtable, psfsipm_filename, sipm_photons_to_pes,
+                                                               wi, el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
                                                                wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time)
 
     ##########################################
