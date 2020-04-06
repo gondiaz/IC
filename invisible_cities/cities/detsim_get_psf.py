@@ -77,14 +77,15 @@ def binedges_from_bincenters(bincenters):
 ##################################
 ############# PSF ################
 ##################################
-def get_sipm_psf_from_file(filename : str)->Callable:
+def get_sipm_psf_from_file(filename : str,
+                           factor   : float = 1.)->Callable:
     with tb.open_file(filename) as h5file:
         psf = h5file.root.PSF.PSFs.read()
 
     #select psf z
     sel = (psf["z"] == np.min(psf["z"]))
     psf = psf[sel]
-    xr, yr, factor = psf["xr"], psf["yr"], psf["factor"]
+    xr, yr, f = psf["xr"], psf["yr"], psf["factor"]
 
     #create binning
     xcenters, ycenters = np.unique(xr), np.unique(yr)
@@ -92,9 +93,9 @@ def get_sipm_psf_from_file(filename : str)->Callable:
     ybins = binedges_from_bincenters(ycenters)
 
     #histogram
-    psf, _ = np.histogramdd((xr, yr), weights=factor, bins=(xbins, ybins))
-
-    return create_xy_function(psf, [xbins, ybins])
+    psf, _ = np.histogramdd((xr, yr), weights=f, bins=(xbins, ybins))
+    H = factor * psf
+    return create_xy_function(H, [xbins, ybins])
 
 
 ##################################
