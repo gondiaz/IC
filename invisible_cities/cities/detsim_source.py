@@ -1,3 +1,4 @@
+import numpy  as np
 import tables as tb
 import pandas as pd
 
@@ -11,12 +12,15 @@ from invisible_cities.io.mcinfo_io import load_mchits_df
 #######################################
 def load_MC(files_in : List[str]) -> Generator:
     for filename in files_in:
-        hits_df = load_mchits_df(filename)
+        with tb.open_file(filename) as h5in:
+            allhits = h5in.root.MC.hits.read()
+            events  = np.unique(allhits["event_id"])
+            for evt in events:
+                hits = allhits[allhits["event_id"]==evt]
 
-        for evt, hits in hits_df.groupby(level=0):
-            yield dict(event_number = evt,
-                       x            = hits.x     .values,
-                       y            = hits.y     .values,
-                       z            = hits.z     .values,
-                       energy       = hits.energy.values,
-                       time         = hits.time  .values)
+                yield dict(event_number = evt,
+                           x = hits["x"],
+                           y = hits["y"],
+                           z = hits["z"],
+                           energy = hits["energy"],
+                           times = hits["time"])
