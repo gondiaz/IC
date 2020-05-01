@@ -7,9 +7,9 @@ from typing import Callable
 #######################################
 ######### ELECTRON SIMULATION #########
 #######################################
-def generate_ionization_electrons(energies    : np.array,
-                                  wi          : float,
-                                  fano_factor : float ) -> np.array:
+def generate_ionization_electrons(wi          : float,
+                                  fano_factor : float,
+                                  energies    : np.array) -> np.array:
     """ generate ionization secondary electrons from energy deposits
     """
     nes  = np.array(energies/wi, dtype = int)
@@ -19,10 +19,10 @@ def generate_ionization_electrons(energies    : np.array,
     return nes
 
 
-def drift_electrons(zs             : np.array,
-                    electrons      : np.array,
-                    lifetime       : float,
-                    drift_velocity : float) -> np.array:
+def drift_electrons(lifetime       : float,
+                    drift_velocity : float,
+                    zs             : np.ndarray,
+                    electrons      : np.ndarray) -> np.array:
     """ returns number of electrons due to lifetime loses from secondary electrons
     """
     ts  = zs / drift_velocity
@@ -31,12 +31,12 @@ def drift_electrons(zs             : np.array,
     return nes
 
 
-def diffuse_electrons(xs                     : np.array,
-                      ys                     : np.array,
-                      zs                     : np.array,
-                      electrons              : np.array,
-                      transverse_diffusion   : float,
-                      longitudinal_diffusion : float)\
+def diffuse_electrons(transverse_diffusion   : float,
+                      longitudinal_diffusion : float,
+                      xs                     : np.ndarray,
+                      ys                     : np.ndarray,
+                      zs                     : np.ndarray,
+                      electrons              : np.ndarray)\
                       -> Tuple[np.array, np.array, np.array]:
     """
     starting from hits with positions xs, ys, zs, and number of electrons,

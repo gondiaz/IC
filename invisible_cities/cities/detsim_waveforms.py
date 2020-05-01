@@ -8,9 +8,9 @@ from invisible_cities.core.core_functions import in_range
 ######### WAVEFORMS ##############
 ##################################
 def create_waveform(times    : np.ndarray,
+                    pes      : np.ndarray,
                     bins     : np.ndarray,
-                    pes      : np.ndarray = None,
-                    nsamples : int = None) -> np.ndarray:
+                    nsamples : int) -> np.ndarray:
     """
     This function builds a waveform from a set of (buffer_time, pes) values.
     This set is of values come from the times and pes arguments.
@@ -27,12 +27,6 @@ def create_waveform(times    : np.ndarray,
     such as the nsamples posterior to T would have N/nsamples counts (included T).
     nsamples must be >=1 an <len(bins).
     """
-    ##### S1 type signal ######
-    if not nsamples:
-        wf, _ = np.histogram(times, bins=bins)
-        return wf
-
-    ##### S2 type signal ######
     if (nsamples<1) or (nsamples>len(bins)):
         raise ValueError("nsamples must lay betwen 1 and len(bins) (inclusive)")
 
@@ -56,7 +50,7 @@ def create_waveform(times    : np.ndarray,
 
 
 def create_sensor_waveforms(signal_type   : str,
-                            wf_buffer_time: float,
+                            buffer_length : float,
                             bin_width     : float) -> Callable:
     """
     This function calls recursively to create_waveform. See create_waveform for
@@ -68,49 +62,22 @@ def create_sensor_waveforms(signal_type   : str,
     wf_buffer_time: a float with the waveform extent (in default IC units)
     bin_width: a float with the time distance between bins in the waveform buffer.
     """
-    bins = np.arange(0, wf_buffer_time + bin_width, bin_width)
+    bins = np.arange(0, buffer_length + bin_width, bin_width)
+
     if signal_type=="S1":
-        def create_sensor_waveforms_(times : list):
-            wfs = np.stack([create_waveform(time, bins) for time in times])
+
+        def create_sensor_waveforms_(S1times : list):
+            wfs = np.stack([np.histogram(times, bins=bins)[0] for times in S1times])
             return wfs
+
     elif signal_type=="S2":
+
         def create_sensor_waveforms_(nsamples       : int,
                                      times          : np.ndarray,
                                      pes_at_sensors : np.ndarray):
-            wfs = np.stack([create_waveform(times, bins, pes, nsamples) for pes in pes_at_sensors])
+            wfs = np.stack([create_waveform(times, pes, bins, nsamples) for pes in pes_at_sensors])
             return wfs
     else:
         ValueError("signal_type must be one of S1 or S1")
 
     return create_sensor_waveforms_
-
-
-# def create_sensor_waveforms(wf_buffer_time : float,
-#                             bin_width      : float,
-#                             signal_type    : str,
-#                             times          : np.ndarray,
-#                             pes_at_sensors : np.ndarray = None,
-#                             nsamples       : int = None) -> np.ndarray:
-#     """
-#     This function calls recursively to create_waveform. See create_waveform for
-#     an explanation of the arguments not explained below.
-#
-#     Input:
-#     pes_at_sensors: an array with size (#sensors, len(times)). It is the same
-#     as pes argument in create_waveform but for each sensor in axis 0.
-#     wf_buffer_time: a float with the waveform extent (in default IC units)
-#     bin_width: a float with the time distance between bins in the waveform buffer.
-#     """
-#
-#     bins = np.arange(0, wf_buffer_time + bin_width, bin_width)
-#     if signal_type == "S1":
-#         wfs = np.stack([create_waveform(time, bins) for time in times])
-#
-#     if signal_type == "S2":
-#         if not np.any(pes_at_sensors):
-#             raise ValueError("pes_at_sensors must be specified for S2 signal type")
-#         if not nsamples:
-#             raise ValueError("nsamples must be specified for S2 signal type")
-#         wfs = np.stack([create_waveform(times, bins, pes, nsamples) for pes in pes_at_sensors])
-#
-#     return wfs
