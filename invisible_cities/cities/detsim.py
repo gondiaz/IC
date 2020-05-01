@@ -9,6 +9,7 @@ units = system_of_units.SystemOfUnits()
 import invisible_cities.database.load_db       as db
 
 from invisible_cities.cities.components import city
+from invisible_cities.cities.components import print_every
 
 from invisible_cities.dataflow  import dataflow as fl
 
@@ -17,45 +18,42 @@ from invisible_cities.io.run_and_event_io import run_and_event_writer
 
 # DETSIM IMPORTS
 from invisible_cities.cities.detsim_source             import load_MC
-from invisible_cities.cities.detsim_simulate_electrons import generate_ionization_electrons
-from invisible_cities.cities.detsim_simulate_electrons import drift_electrons
-from invisible_cities.cities.detsim_simulate_electrons import diffuse_electrons
+from invisible_cities.cities.detsim_simulate_electrons import generate_ionization_electrons as generate_ionization_electrons_
+from invisible_cities.cities.detsim_simulate_electrons import drift_electrons               as drift_electrons_
+from invisible_cities.cities.detsim_simulate_electrons import diffuse_electrons             as diffuse_electrons_
 
-from invisible_cities.cities.detsim_simulate_photons   import generate_s1_photons
-from invisible_cities.cities.detsim_simulate_photons   import generate_s2_photons
-from invisible_cities.cities.detsim_simulate_photons   import pes_at_sensors
+from invisible_cities.cities.detsim_simulate_photons   import generate_s1_photons           as generate_S1_photons_
+from invisible_cities.cities.detsim_simulate_photons   import generate_s2_photons           as generate_S2_photons_
 
-from invisible_cities.cities.detsim_waveforms          import create_sensor_waveforms
+from invisible_cities.cities.detsim_simulate_signal    import pes_at_pmts
+from invisible_cities.cities.detsim_simulate_signal    import pes_at_sipms
+from invisible_cities.cities.detsim_simulate_signal    import generate_S1_times_from_pes    as generate_S1_times_from_pes_
 
-from invisible_cities.cities.detsim_get_psf            import get_sipm_psf_from_file
+from invisible_cities.cities.detsim_waveforms          import create_sensor_waveforms       as create_sensor_waveforms_
+
+from invisible_cities.cities.detsim_get_psf            import get_psf
 from invisible_cities.cities.detsim_get_psf            import get_ligthtables
-from invisible_cities.cities.detsim_get_psf            import get_krmaps_as_ligthtables
 
 
 def get_derived_parameters(detector_db, run_number,
-                           s1_ligthtable, s2_ligthtable, psfsipm_filename, mean_kr_s2charge,
-                           wi, el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
-                           wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time):
+                           s1_ligthtable, s2_ligthtable, sipm_psf,
+                           el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
+                           wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width):
     ########################
     ######## Globals #######
     ########################
     datapmt  = db.DataPMT (detector_db, run_number)
     datasipm = db.DataSiPM(detector_db, run_number)
 
-    nphotons = (41.5 * units.keV / wi) * el_gain
-    sipm_photons_to_pes = mean_kr_s2charge/nphotons
-
-    # S1pmt_psf  = partial(fn._psf, factor=1e5)
-    # S2pmt_psf  = fn.get_psf_from_krmap     (krmap_filename, factor=1./nphotons)
     S1_LT = get_ligthtables(s1_ligthtable, "S1")
     S2_LT = get_ligthtables(s2_ligthtable, "S2")
-    S2sipm_psf = get_sipm_psf_from_file(psfsipm_filename, factor = sipm_photons_to_pes)
+    S2sipm_psf = get_psf(sipm_psf)
 
     el_gain_sigma = np.sqrt(el_gain * conde_policarpo_factor)
-    EL_dtime      =  EL_dz / drift_velocity_EL
 
-    s2_pmt_nsamples  = np.max((int(EL_dtime // wf_pmt_bin_time ), 1))
-    s2_sipm_nsamples = np.max((int(EL_dtime // wf_sipm_bin_time), 1))
+    EL_dtime      =  EL_dz / drift_velocity_EL
+    s2_pmt_nsamples  = np.max((int(EL_dtime // wf_pmt_bin_width ), 1))
+    s2_sipm_nsamples = np.max((int(EL_dtime // wf_sipm_bin_width), 1))
 
     return datapmt, datasipm,\
            S1_LT, S2_LT, S2sipm_psf,\
@@ -64,10 +62,11 @@ def get_derived_parameters(detector_db, run_number,
 
 
 @city
-def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, psfsipm_filename,
+def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, sipm_psf,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
-           el_gain, conde_policarpo_factor, EP_z, EL_dz, drift_velocity_EL, mean_kr_s2charge,
-           wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time):
+           el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
+           wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
+           print_mod):
     ########################
     ######## Globals #######
     ########################
@@ -75,92 +74,113 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     S1_LT, S2_LT, S2sipm_psf,\
     el_gain_sigma,\
     s2_pmt_nsamples, s2_sipm_nsamples = get_derived_parameters(detector_db, run_number,
-                                                               s1_ligthtable, s2_ligthtable, psfsipm_filename, mean_kr_s2charge,
-                                                               wi, el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
-                                                               wf_buffer_time, wf_pmt_bin_time, wf_sipm_bin_time)
+                                                               s1_ligthtable, s2_ligthtable, sipm_psf,
+                                                               el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
+                                                               wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width)
+    ## add globals
+    n_el_partitions = 6
+    psf_el_pitch    = 1 * units.mm
+    s2_sipm_nsamples = np.max((int(psf_el_pitch // wf_sipm_bin_width), 1))
+    xsipms, ysipms = datasipm["X"].values, datasipm["Y"].values
 
     ##########################################
     ############ SIMULATE ELECTRONS ##########
     ##########################################
-    generate_electrons_ = partial(generate_ionization_electrons, wi = wi, fano_factor = fano_factor)
-    generate_electrons_ = fl.map(generate_electrons_, args = ("energy"), out  = ("electrons"))
+    generate_ionization_electrons = partial(generate_ionization_electrons_, wi, fano_factor)
+    generate_ionization_electrons = fl.map(generate_ionization_electrons, args = ("energy"), out  = ("electrons"))
 
-    drift_electrons_ = partial(drift_electrons, lifetime = lifetime, drift_velocity = drift_velocity)
-    drift_electrons_ = fl.map(drift_electrons_, args = ("z", "electrons"), out  = ("electrons"))
-    count_electrons  = fl.map(lambda x: np.sum(x), args=("electrons"), out=("nes"))
+    drift_electrons = partial(drift_electrons_, lifetime, drift_velocity)
+    drift_electrons = fl.map(drift_electrons, args = ("z", "electrons"), out  = ("electrons"))
 
-    diffuse_electrons_ = partial(diffuse_electrons, transverse_diffusion = transverse_diffusion, longitudinal_diffusion = longitudinal_diffusion)
-    diffuse_electrons_ = fl.map(diffuse_electrons_, args = ("x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
+    count_electrons = fl.map(lambda x: np.sum(x), args=("electrons"), out=("nes"))
 
-    simulate_electrons = fl.pipe(generate_electrons_, drift_electrons_, count_electrons, diffuse_electrons_)
+    diffuse_electrons = partial(diffuse_electrons_, transverse_diffusion, longitudinal_diffusion)
+    diffuse_electrons = fl.map(diffuse_electrons, args = ("x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
+
+    simulate_electrons = fl.pipe(generate_ionization_electrons, drift_electrons, count_electrons, diffuse_electrons)
 
     ############################################
     ############ SIMULATE PHOTONS ##############
     ############################################
     # S1#
-    generate_S1_photons = partial(generate_s1_photons, ws = ws)
+    generate_S1_photons = partial(generate_S1_photons_, ws)
     generate_S1_photons = fl.map(generate_S1_photons, args = ("energy"), out  = ("S1photons"))
 
-    S1pes_at_pmts = partial(pes_at_sensors, LT = S1_LT)
-    S1pes_at_pmts = fl.map(S1pes_at_pmts, args = ("x", "y", "S1photons", "z"), out  = ("S1pes_pmt"))
-
     # S2 #
-    generate_S2_photons = partial(generate_s2_photons, el_gain = el_gain, el_gain_sigma = el_gain_sigma)
+    generate_S2_photons = partial(generate_S2_photons_, el_gain, el_gain_sigma)
     generate_S2_photons = fl.map(generate_S2_photons, args = ("nes"), out  = ("S2photons"))
 
-    S2pes_at_pmts = partial(pes_at_sensors, LT = S2_LT)
-    S2pes_at_pmts = fl.map(S2pes_at_pmts, args = ("dx", "dy", "S2photons"), out  = ("S2pes_pmt"))
+    simulate_photons = fl.pipe(generate_S1_photons, generate_S2_photons)
 
-    S2pes_at_sipms = partial(pes_at_sensors, x_sensors = datasipm["X"].values, y_sensors = datasipm["Y"].values, psf = S2sipm_psf)
-    S2pes_at_sipms = fl.map(S2pes_at_sipms, args = ("dx", "dy", "S2photons"), out  = ("S2pes_sipm"))
+    #############################################
+    ############ SIMULATE SENSOR SIGNAL #########
+    #############################################
+    ## PMTs ##
+    compute_S1pes_at_pmts = partial(pes_at_pmts, S1_LT)
+    compute_S1pes_at_pmts = fl.map(compute_S1pes_at_pmts, args = ("S1photons", "x", "y", "z"), out  = ("S1pes_at_pmts"))
 
-    simulate_photons = fl.pipe(generate_S1_photons, S1pes_at_pmts, generate_S2_photons, S2pes_at_pmts, S2pes_at_sipms)
+    compute_S2pes_at_pmts = partial(pes_at_pmts, S2_LT)
+    compute_S2pes_at_pmts = fl.map(compute_S2pes_at_pmts, args = ("S2photons", "dx", "dy"), out  = ("S2pes_at_pmts"))
 
-    ############################
-    ###### BUFFER TIMES ########
-    ############################
-    def generate_S1_time(size=1):
-        r = []
-        for i in range(size):
-            t1 = np.random.exponential(4.5)
-            t2 = np.random.exponential(100)
-            r.append(np.random.choice([t1, t2], p=[0.1, 0.9]))
-        return np.array(r)
+    generate_S1_times_from_pes = fl.map(generate_S1_times_from_pes_, args=("S1pes_at_pmts"), out=("S1times"))
+    compute_S2times = lambda zs, times, electrons: zs/drift_velocity + np.repeat(times, electrons)
+    compute_S2times = fl.map(compute_S2times, args=("dz", "times", "electrons"), out=("S2times"))
 
-    def generate_S1_times_from_pes(S1pes_pmt):
-        S1pes_pmt = np.sum(S1pes_pmt, axis=1)
-        S1times = [generate_S1_time(size=pes) for pes in S1pes_pmt]
-        return S1times
+    simulate_pmt_signal = fl.pipe(compute_S1pes_at_pmts, compute_S2pes_at_pmts, generate_S1_times_from_pes, compute_S2times)
 
-    S1times_        = fl.map(generate_S1_times_from_pes, args=("S1pes_pmt"), out=("S1times"))
-    S1_buffer_times = fl.map(lambda S1times: [100 * units.mus + t for t in S1times], args=("S1times"), out=("S1_buffer_times"))
-    S2_buffer_times = fl.map(lambda dz     :  100 * units.mus + dz/drift_velocity,   args=("dz"),      out=("S2_buffer_times"))
+    ## SIPMs ##
+    compute_S2pes_at_sipms = partial(pes_at_sipms, S2sipm_psf, xsipms, ysipms)
+    compute_S2pes_at_sipms = fl.map(compute_S2pes_at_sipms, args=("S2photons", "dx", "dy"), out=("S2pes_at_sipms"))
 
-    # S1_buffer_times = fl.map(lambda dz, z: (wf_buffer_time/2. - np.min(dz)/drift_velocity)*np.ones_like(z), args = ("dz", "z"), out=("S1_buffer_times"))
-    # S2_buffer_times = fl.map(lambda dz   :  wf_buffer_time/2. + (dz - np.min(dz))/drift_velocity          , args = ("dz")     , out=("S2_buffer_times"))
+    compute_S2times_EL = lambda S2times: np.concatenate([S2times + i*psf_el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)])
+    compute_S2times_EL = fl.map(compute_S2times_EL, args=("S2times"), out=("S2times_EL"))
 
-    ############################
-    ######### FILL WFS #########
-    ############################
-    create_S1_waveform = create_sensor_waveforms("S1", wf_buffer_time, wf_pmt_bin_time)
-    fill_S1_pmts = fl.map(create_S1_waveform, args = ("S1_buffer_times"), out=("S1pmtwfs"))
+    simulate_sipm_signal = fl.pipe(compute_S2pes_at_sipms, compute_S2times_EL)
 
-    create_S2pmt_waveforms = create_sensor_waveforms("S2", wf_buffer_time, wf_pmt_bin_time)
-    fill_S2_pmts  = fl.map(partial(create_S2pmt_waveforms, s2_pmt_nsamples), args = ("S2_buffer_times", "S2pes_pmt"), out=("S2pmtwfs"))
+    simulate_signal = fl.pipe(simulate_pmt_signal, simulate_sipm_signal)
 
-    create_S2sipm_waveforms = create_sensor_waveforms("S2", wf_buffer_time, wf_sipm_bin_time)
-    fill_S2_sipms = fl.map(partial(create_S2sipm_waveforms, s2_sipm_nsamples), args = ("S2_buffer_times", "S2pes_sipm"), out=("sipmwfs"))
+    ################################
+    ######### BUFFER TIMES #########
+    ################################
+    ## PMTs ##
+    set_S1buffertimes = lambda S1times: [100 * units.mus + times for times in S1times]
+    set_S1buffertimes = fl.map(set_S1buffertimes, args=("S1times"), out=("S1buffertimes_pmt"))
 
-    add_pmt_wfs = fl.map(lambda x, y: x + y, args=("S1pmtwfs", "S2pmtwfs"), out=("pmtwfs"))
+    set_S2buffertimes = lambda S2times: 100 * units.mus + S2times
+    set_S2buffertimes_pmt = fl.map(set_S2buffertimes, args=("S2times"), out=("S2buffertimes_pmt"))
 
+    ## SIPMs ##
+    set_S2buffertimes_sipm = fl.map(set_S2buffertimes, args=("S2times_EL"), out=("S2buffertimes_sipm"))
+
+    set_buffer_times = fl.pipe(set_S1buffertimes, set_S2buffertimes_pmt, set_S2buffertimes_sipm)
+
+    ####################################
+    ######### CREATE WAVEFORMS #########
+    ####################################
+    ## PMTs ##
+    create_S1pmtwfs = create_sensor_waveforms_("S1", wf_buffer_length, wf_pmt_bin_width)
+    create_S1pmtwfs = fl.map(create_S1pmtwfs, args=("S1buffertimes_pmt"), out=("S1pmtwfs"))
+
+    create_S2pmtwfs = create_sensor_waveforms_("S2", wf_buffer_length, wf_pmt_bin_width)
+    create_S2pmtwfs = partial(create_S2pmtwfs, s2_pmt_nsamples)
+    create_S2pmtwfs = fl.map(create_S2pmtwfs, args=("S2buffertimes_pmt", "S2pes_at_pmts"), out=("S2pmtwfs"))
+
+    add_pmtwfs = fl.map(lambda x, y: x + y, args=("S1pmtwfs", "S2pmtwfs"), out=("pmtwfs"))
+
+    ## SIPMs ##
+    create_S2sipmwfs = create_sensor_waveforms_("S2", wf_buffer_length, wf_sipm_bin_width)
+    create_S2sipmwfs = partial(create_S2sipmwfs, s2_sipm_nsamples)
+    create_S2sipmwfs = fl.map(create_S2sipmwfs, args=("S2buffertimes_sipm", "S2pes_at_sipms"), out=("sipmwfs"))
+
+    create_waveforms = fl.pipe(create_S1pmtwfs, create_S2pmtwfs, add_pmtwfs, create_S2sipmwfs)
 
     with tb.open_file(file_out, "w") as h5out:
 
         ######################################
         ############# WRITE WFS ##############
         ######################################
-        write_pmtwfs  = rwf_writer(h5out, group_name = None, table_name = "pmtrd" , n_sensors = len(datapmt) , waveform_length = int(wf_buffer_time // wf_pmt_bin_time))
-        write_sipmwfs = rwf_writer(h5out, group_name = None, table_name = "sipmrd", n_sensors = len(datasipm), waveform_length = int(wf_buffer_time // wf_sipm_bin_time))
+        write_pmtwfs  = rwf_writer(h5out, group_name = None, table_name = "pmtrd" , n_sensors = len(datapmt) , waveform_length = int(wf_buffer_length // wf_pmt_bin_width))
+        write_sipmwfs = rwf_writer(h5out, group_name = None, table_name = "sipmrd", n_sensors = len(datasipm), waveform_length = int(wf_buffer_length // wf_sipm_bin_width))
         write_pmtwfs  = fl.sink(write_pmtwfs, args=("pmtwfs"))
         write_sipmwfs = fl.sink(write_sipmwfs, args=("sipmwfs"))
 
@@ -169,16 +189,13 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
 
         return fl.push(source=load_MC(files_in),
                        pipe  = fl.pipe(fl.slice(*event_range, close_all=True),
+                                       print_every(print_mod),
                                        simulate_electrons,
                                        simulate_photons,
                                        # fl.spy(lambda d: [print(k) for k in d]),
-                                       S1times_,
-                                       S1_buffer_times,
-                                       S2_buffer_times,
-                                       fill_S1_pmts,
-                                       fill_S2_pmts,
-                                       fill_S2_sipms,
-                                       add_pmt_wfs,
+                                       simulate_signal,
+                                       set_buffer_times,
+                                       create_waveforms,
                                        fl.fork(write_pmtwfs,
                                                write_sipmwfs,
                                                write_run_event)),
