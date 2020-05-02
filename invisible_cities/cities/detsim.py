@@ -4,9 +4,9 @@ import pandas as pd
 
 from functools import partial
 
-import invisible_cities.core.system_of_units_c as system_of_units
-units = system_of_units.SystemOfUnits()
-import invisible_cities.database.load_db       as db
+from invisible_cities.core import system_of_units as units
+
+import invisible_cities.database.load_db     as db
 
 from invisible_cities.cities.components import city
 from invisible_cities.cities.components import print_every
