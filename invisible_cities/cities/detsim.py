@@ -6,12 +6,12 @@ from functools import partial
 
 from invisible_cities.core import system_of_units as units
 
-import invisible_cities.database.load_db     as db
+import invisible_cities.database.load_db          as db
 
 from invisible_cities.cities.components import city
 from invisible_cities.cities.components import print_every
 
-from invisible_cities.dataflow  import dataflow as fl
+from invisible_cities.dataflow  import dataflow   as fl
 
 from invisible_cities.io.rwf_io           import rwf_writer
 from invisible_cities.io.run_and_event_io import run_and_event_writer
