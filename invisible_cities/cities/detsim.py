@@ -47,17 +47,23 @@ def get_derived_parameters(detector_db, run_number,
 
     S1_LT = get_ligthtables(s1_ligthtable, "S1")
     S2_LT = get_ligthtables(s2_ligthtable, "S2")
-    S2sipm_psf = get_psf(sipm_psf)
+    S2sipm_psf, psf_info = get_psf(sipm_psf)
+
+    EL_GAP  = float(str(psf_info[b"EL_GAP"] , errors="ignore")) * units.mm
+    if EL_GAP!=EL_dz:
+        raise Exception("EL_dz and EL_GAP from sipmpsf must be equal")
+    el_pitch = float(str(psf_info[b"pitch_z"], errors="ignore")) * units.mm
+    n_el_partitions = int(EL_GAP/el_pitch)
 
     el_gain_sigma = np.sqrt(el_gain * conde_policarpo_factor)
 
     EL_dtime      =  EL_dz / drift_velocity_EL
     s2_pmt_nsamples  = np.max((int(EL_dtime // wf_pmt_bin_width ), 1))
-    s2_sipm_nsamples = np.max((int(EL_dtime // wf_sipm_bin_width), 1))
+    s2_sipm_nsamples = np.max((int(el_pitch // wf_sipm_bin_width), 1))
 
     return datapmt, datasipm,\
            S1_LT, S2_LT, S2sipm_psf,\
-           el_gain_sigma,\
+           el_pitch, n_el_partitions, el_gain_sigma,\
            s2_pmt_nsamples, s2_sipm_nsamples
 
 
@@ -72,15 +78,15 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     ########################
     datapmt, datasipm,\
     S1_LT, S2_LT, S2sipm_psf,\
-    el_gain_sigma,\
+    el_pitch, n_el_partitions, el_gain_sigma,\
     s2_pmt_nsamples, s2_sipm_nsamples = get_derived_parameters(detector_db, run_number,
                                                                s1_ligthtable, s2_ligthtable, sipm_psf,
                                                                el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
                                                                wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width)
     ## add globals
-    n_el_partitions = 6
-    psf_el_pitch    = 1 * units.mm
-    s2_sipm_nsamples = np.max((int(psf_el_pitch // wf_sipm_bin_width), 1))
+    #n_el_partitions = 6
+    #psf_el_pitch    = 1 * units.mm
+    # s2_sipm_nsamples = np.max((int(psf_el_pitch // wf_sipm_bin_width), 1))
     xsipms, ysipms = datasipm["X"].values, datasipm["Y"].values
 
     ##########################################
@@ -132,7 +138,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     compute_S2pes_at_sipms = partial(pes_at_sipms, S2sipm_psf, xsipms, ysipms)
     compute_S2pes_at_sipms = fl.map(compute_S2pes_at_sipms, args=("S2photons", "dx", "dy"), out=("S2pes_at_sipms"))
 
-    compute_S2times_EL = lambda S2times: np.concatenate([S2times + i*psf_el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)])
+    compute_S2times_EL = lambda S2times: np.concatenate([S2times + i*el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)])
     compute_S2times_EL = fl.map(compute_S2times_EL, args=("S2times"), out=("S2times_EL"))
 
     simulate_sipm_signal = fl.pipe(compute_S2pes_at_sipms, compute_S2times_EL)

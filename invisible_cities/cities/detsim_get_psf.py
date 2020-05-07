@@ -99,6 +99,7 @@ def binedges_from_bincenters(bincenters):
 def get_psf(filename):
     with tb.open_file(filename) as h5file:
         PSF = h5file.root.LightTable.table.read()
+        info = h5file.root.Config.table.read()
 
     PSF  = np.sort(PSF, order="index")
     bins = PSF["index"]
@@ -111,7 +112,7 @@ def get_psf(filename):
         out[sel] = PSF[idxs]
         return np.swapaxes(out, 0, 2)            #(npartitions, nsensors, nhits)
 
-    return psf
+    return psf, dict(info)
 
 
 ##################################
