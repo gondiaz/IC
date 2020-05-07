@@ -123,6 +123,11 @@ def get_ligthtables(filename: str,
     ##### Load LT ######
     with tb.open_file(filename) as h5file:
         LT = h5file.root.LightTable.table.read()
+        info = dict(h5file.root.Config.table.read())
+
+    sensor = str(info[b'sensor'], errors="ignore")
+    sensors = [name for name in LT.dtype.names if sensor in name and "total" not in name]
+    sensors.sort(key=lambda name: int(name.split("_")[-1]))
 
     if signal == "S1":
         #### XYZ binning #####
@@ -136,13 +141,10 @@ def get_ligthtables(filename: str,
 
         ###### CREATE XYZ FUNCTION FOR EACH SENSOR ######
         func_per_sensor = []
-        sensors = [f"PmtR11410_{i}" for i in range(0, 12)]
         for sensor in sensors:
             w = LT[sensor]
-
             H, _ = np.histogramdd((x, y, z), weights=w, bins=bins)
             fxyz = create_xyz_function(H, bins)
-
             func_per_sensor.append(fxyz)
 
         ###### CREATE XYZ CALLABLE FOR LIST OF XYZ FUNCTIONS #####
@@ -163,7 +165,7 @@ def get_ligthtables(filename: str,
 
         ###### CREATE XY FUNCTION FOR EACH SENSOR ######
         func_per_sensor = []
-        sensors = [f"PmtR11410_{i}" for i in range(0, 12)]
+        # sensors = [f"PmtR11410_{i}" for i in range(0, 12)]
         for sensor in sensors:
             w = LT[sensor]
 
