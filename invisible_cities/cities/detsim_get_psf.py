@@ -106,12 +106,12 @@ def get_psf(filename):
     PSF = np.array(PSF.tolist())[:, 1:]
 
     def psf(d):
-        out = np.zeros((*d.shape, PSF.shape[1])) #(nhits, nsensors, npartitions)
+        out = np.zeros((*d.shape, PSF.shape[1]))
         sel = in_range(d, bins[0], bins[-1])
         idxs = np.digitize(d[sel], bins)-1
         out[sel] = PSF[idxs]
-        return np.swapaxes(out, 0, 2)            #(npartitions, nsensors, nhits)
-
+        return out            #(nsensors, nhits, npartitions)
+        
     return psf, info
 
 
