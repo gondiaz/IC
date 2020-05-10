@@ -35,14 +35,15 @@ def pes_at_sipms(PSF     : Callable,
 
     xdistance = xs[:, np.newaxis] - xsensors
     ydistance = ys[:, np.newaxis] - ysensors
-
     distances = (xdistance**2 + ydistance**2)**0.5
-    pes = PSF(distances) * photons
 
-    npartitions, nsensors, nhits = pes.shape
-    pes = np.random.poisson(pes/npartitions)  #assume photons are emited uniformly inside the EL
-    return np.concatenate(pes, axis=1)
-    #return np.reshape(np.swapaxes(pes, 0, 1), (nsensors, npartitions*nhits))
+    psf = PSF(distances.T)
+    nsensors, nhits, npartitions = psf.shape
+    psf = np.reshape(psf, (nsensors, nhits*npartitions))
+
+    pes = np.multiply(psf, np.repeat(photons, npartitions))
+    pes = np.random.poisson(pes/npartitions)
+    return pes
 
 
 ##################################

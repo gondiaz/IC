@@ -138,7 +138,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     compute_S2pes_at_sipms = partial(pes_at_sipms, S2sipm_psf, xsipms, ysipms)
     compute_S2pes_at_sipms = fl.map(compute_S2pes_at_sipms, args=("S2photons", "dx", "dy"), out=("S2pes_at_sipms"))
 
-    compute_S2times_EL = lambda S2times: np.concatenate([S2times + i*el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)])
+    #compute_S2times_EL = lambda S2times: np.concatenate([S2times + i*el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)])
+    compute_S2times_EL = lambda S2times: np.stack([S2times[:, np.newaxis] + i*el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)], axis=1).flatten()
     compute_S2times_EL = fl.map(compute_S2times_EL, args=("S2times"), out=("S2times_EL"))
 
     simulate_sipm_signal = fl.pipe(compute_S2pes_at_sipms, compute_S2times_EL)
