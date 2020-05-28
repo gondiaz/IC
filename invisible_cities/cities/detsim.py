@@ -74,6 +74,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
            el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
            wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
            print_mod, compression):
+
     ########################
     ######## Globals #######
     ########################
