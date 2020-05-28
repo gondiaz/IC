@@ -5,6 +5,7 @@ import pandas as pd
 from functools import partial
 
 from invisible_cities.core import system_of_units as units
+from invisible_cities.reco import tbl_functions   as tbl
 
 import invisible_cities.database.load_db          as db
 
@@ -72,7 +73,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
            el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
            wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
-           print_mod):
+           print_mod, compression):
     ########################
     ######## Globals #######
     ########################
@@ -181,7 +182,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
 
     create_waveforms = fl.pipe(create_S1pmtwfs, create_S2pmtwfs, add_pmtwfs, create_S2sipmwfs)
 
-    with tb.open_file(file_out, "w") as h5out:
+    with tb.open_file(file_out, "w", filters = tbl.filters(compression)) as h5out:
 
         ######################################
         ############# WRITE WFS ##############
