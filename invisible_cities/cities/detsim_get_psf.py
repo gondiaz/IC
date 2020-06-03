@@ -67,7 +67,7 @@ def create_xy_function(H, bins):
 
 def binedges_from_bincenters(bincenters):
     ds = np.diff(bincenters)
-    if ~np.all(ds == ds[0]):
+    if not np.allclose(ds, ds[0]):
         raise Exception("Bin distances must be equal")
 
     d = ds[0]
@@ -102,7 +102,7 @@ def get_psf(filename):
         info = dict(h5file.root.Config.table.read())
 
     PSF  = np.sort(PSF, order="index")
-    bins = PSF["index"]
+    bins = binedges_from_bincenters(PSF["index"])
     PSF = np.array(PSF.tolist())[:, 1:]
 
     def psf(d):
@@ -111,7 +111,7 @@ def get_psf(filename):
         idxs = np.digitize(d[sel], bins)-1
         out[sel] = PSF[idxs]
         return out            #(nsensors, nhits, npartitions)
-        
+
     return psf, info
 
 
