@@ -65,13 +65,24 @@ def create_xy_function(H, bins):
         return out
     return function
 
-def binedges_from_bincenters(bincenters):
-    ds = np.diff(bincenters)
-    if not np.allclose(ds, ds[0]):
-        raise Exception("Bin distances must be equal")
 
-    d = ds[0]
-    return np.arange(bincenters[0]-d/2., bincenters[-1]+d/2.+d, d)
+def binedges_from_bincenters(bincenters):
+
+    binedges = np.zeros(len(bincenters)+1)
+
+    binedges[1:-1] = (bincenters[1:] + bincenters[:-1])/2.
+    binedges[0]  = bincenters[0]
+    binedges[-1] = bincenters[-1]
+
+    return binedges
+
+# def binedges_from_bincenters(bincenters):
+#     ds = np.diff(bincenters)
+#     if not np.allclose(ds, ds[0]):
+#         raise Exception("Bin distances must be equal")
+#
+#     d = ds[0]
+#     return np.arange(bincenters[0]-d/2., bincenters[-1]+d/2.+d, d)
 
 ##################################
 ############# PSF ################
