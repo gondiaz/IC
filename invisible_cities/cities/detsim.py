@@ -72,7 +72,7 @@ def get_derived_parameters(detector_db, run_number,
 def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, sipm_psf,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
            el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
-           wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
+           pretrigger, wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
            print_mod, compression):
 
     ########################
@@ -152,10 +152,10 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     ######### BUFFER TIMES #########
     ################################
     ## PMTs ##
-    set_S1buffertimes = lambda S1times: [100 * units.mus + times for times in S1times]
+    set_S1buffertimes = lambda S1times: [pretrigger + times for times in S1times]
     set_S1buffertimes = fl.map(set_S1buffertimes, args=("S1times"), out=("S1buffertimes_pmt"))
 
-    set_S2buffertimes = lambda S2times: 100 * units.mus + S2times
+    set_S2buffertimes = lambda S2times: pretrigger + S2times
     set_S2buffertimes_pmt = fl.map(set_S2buffertimes, args=("S2times"), out=("S2buffertimes_pmt"))
 
     ## SIPMs ##
@@ -190,7 +190,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
         ######################################
         write_pmtwfs  = rwf_writer(h5out, group_name = None, table_name = "pmtrd" , n_sensors = len(datapmt) , waveform_length = int(wf_buffer_length // wf_pmt_bin_width))
         write_sipmwfs = rwf_writer(h5out, group_name = None, table_name = "sipmrd", n_sensors = len(datasipm), waveform_length = int(wf_buffer_length // wf_sipm_bin_width))
-        write_pmtwfs  = fl.sink(write_pmtwfs, args=("pmtwfs"))
+        write_pmtwfs  = fl.sink(write_pmtwfs , args=("pmtwfs"))
         write_sipmwfs = fl.sink(write_sipmwfs, args=("sipmwfs"))
 
         write_run_event = partial(run_and_event_writer(h5out), run_number, timestamp=0)
