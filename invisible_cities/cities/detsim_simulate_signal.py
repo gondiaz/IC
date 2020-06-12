@@ -2,6 +2,8 @@ import numpy as np
 
 from typing import Callable
 
+from scipy.stats import rv_continuous
+
 
 ##################################
 ############## PES ###############
@@ -49,15 +51,27 @@ def pes_at_sipms(PSF     : Callable,
 ##################################
 ############## TIMES #############
 ##################################
-def generate_S1_time(size=1):
-    """This function generates an array of size with a time random variable
-    distributed: 0.1*exp(t/4.5) + 0.9*exp(t/100). This is the S1 emission time."""
-    r = []
-    for i in range(size):
-        t1 = np.random.exponential(4.5)
-        t2 = np.random.exponential(100)
-        r.append(np.random.choice([t1, t2], p=[0.1, 0.9]))
-    return np.array(r)
+# def generate_S1_time(size=1):
+#     """This function generates an array of size with a time random variable
+#     distributed: 0.1*exp(t/4.5) + 0.9*exp(t/100). This is the S1 emission time."""
+#     r = []
+#     for i in range(size):
+#         t1 = np.random.exponential(4.5)
+#         t2 = np.random.exponential(100)
+#         r.append(np.random.choice([t1, t2], p=[0.1, 0.9]))
+#     return np.array(r)
+
+class S1_TIMES(rv_continuous):
+    """S1 times distribution generator.
+    Following distribution 0.1*exp(t/4.5) + 0.9*exp(t/100)"""
+
+    def __init__(self):
+        super().__init__(a=0)
+
+    def _pdf(self, x):
+        return (0.1*np.exp(-x/4.5) + 0.9*np.exp(-x/100))*1/(0.1*4.5 + 0.9*100)
+
+generate_S1_time = S1_TIMES()
 
 def generate_S1_times_from_pes(S1pes_at_pmts):
     """Given the S1pes_at_pmts, this function returns the times at which the pes
@@ -66,7 +80,7 @@ def generate_S1_times_from_pes(S1pes_at_pmts):
     are generated.
     """
     S1pes_pmt = np.sum(S1pes_at_pmts, axis=1)
-    S1times = [generate_S1_time(size=pes) for pes in S1pes_pmt]
+    S1times = [generate_S1_time.rvs(size=pes) for pes in S1pes_pmt]
     return S1times
 
 # def pes_at_sensors(xs         : np.ndarray,
