@@ -4,12 +4,14 @@ from typing import List
 from typing import Tuple
 from typing import Callable
 
+from invisible_cities.cities.detsim_get_psf import binedges_from_bincenters
+
 #######################################
 ######### ELECTRON SIMULATION #########
 #######################################
 def generate_ionization_electrons(wi          : float,
                                   fano_factor : float,
-                                  energies    : np.array) -> np.array:
+                                  energies    : np.ndarray) -> np.ndarray:
     """ generate ionization secondary electrons from energy deposits
     """
     nes  = np.array(energies/wi, dtype = int)
@@ -37,7 +39,7 @@ def diffuse_electrons(transverse_diffusion   : float,
                       ys                     : np.ndarray,
                       zs                     : np.ndarray,
                       electrons              : np.ndarray)\
-                      -> Tuple[np.array, np.array, np.array]:
+                      -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     starting from hits with positions xs, ys, zs, and number of electrons,
     apply diffusion and return diffused positions xs, ys, zs for each electron
@@ -52,3 +54,42 @@ def diffuse_electrons(transverse_diffusion   : float,
     dzs  = np.random.normal(zs, sqrtz * longitudinal_diffusion)
 
     return (dxs, dys, dzs)
+
+
+def voxelize(voxel_size : list,
+             dx         : np.ndarray,
+             dy         : np.ndarray,
+             dz         : np.ndarray)\
+             ->Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+
+    if voxel_size:
+
+        ####### HISTOGRAM dx, dy, dz #######
+
+        xmin, xmax = np.min(dx), np.max(dx)
+        ymin, ymax = np.min(dy), np.max(dy)
+        zmin, zmax = np.min(dz), np.max(dz)
+
+        xcenters = np.arange(xmin, xmax + voxel_size[0], voxel_size[0])
+        ycenters = np.arange(ymin, ymax + voxel_size[1], voxel_size[1])
+        zcenters = np.arange(zmin, zmax + voxel_size[2], voxel_size[2])
+
+        xbins = binedges_from_bincenters(xcenters)
+        ybins = binedges_from_bincenters(ycenters)
+        zbins = binedges_from_bincenters(zcenters)
+
+        H, _ = np.histogramdd((dx, dy, dz), bins=[xbins, ybins, zbins])
+
+        ######### RECOVER dx, dy, dz with updated nes ######
+
+        dx, dy, dz = np.meshgrid(xcenters, ycenters, zcenters, indexing="ij")
+        dx, dy, dz = dx.flatten(), dy.flatten(), dz.flatten()
+        nes = H.flatten()
+
+        sel = nes>0
+        dx, dy, dz, nes = dx[sel], dy[sel], dz[sel], nes[sel]
+
+        return dx, dy, dz, nes
+
+    else:
+        return dx, dy, dz, np.ones(dx.shape)

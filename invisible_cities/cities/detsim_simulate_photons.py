@@ -14,11 +14,12 @@ def generate_s1_photons(ws       : float,
 
 def generate_s2_photons(el_gain        : float,
                         el_gain_sigma  : float,
-                        n              : int) -> np.ndarray:
+                        nes            : np.ndarray) -> np.ndarray:
     """generate number of EL-photons produced by secondary electrons that reach
     the EL (after drift and diffusion)
     """
-    nphs = np.random.normal(el_gain, el_gain_sigma, size = n)
+    # nphs = np.random.normal(el_gain, el_gain_sigma, size = n)
+    nphs = np.random.normal(el_gain*nes, el_gain_sigma)
     return nphs
 
 

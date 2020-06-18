@@ -22,6 +22,7 @@ from invisible_cities.cities.detsim_source             import load_MC
 from invisible_cities.cities.detsim_simulate_electrons import generate_ionization_electrons as generate_ionization_electrons_
 from invisible_cities.cities.detsim_simulate_electrons import drift_electrons               as drift_electrons_
 from invisible_cities.cities.detsim_simulate_electrons import diffuse_electrons             as diffuse_electrons_
+from invisible_cities.cities.detsim_simulate_electrons import voxelize                      as voxelize_
 
 from invisible_cities.cities.detsim_simulate_photons   import generate_s1_photons           as generate_S1_photons_
 from invisible_cities.cities.detsim_simulate_photons   import generate_s2_photons           as generate_S2_photons_
@@ -71,7 +72,7 @@ def get_derived_parameters(detector_db, run_number,
 @city
 def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, sipm_psf,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
-           el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
+           el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL, voxel_size,
            pretrigger, wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
            print_mod, compression):
 
@@ -85,10 +86,6 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
                                                                s1_ligthtable, s2_ligthtable, sipm_psf,
                                                                el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
                                                                wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width)
-    ## add globals
-    #n_el_partitions = 6
-    #psf_el_pitch    = 1 * units.mm
-    # s2_sipm_nsamples = np.max((int(psf_el_pitch // wf_sipm_bin_width), 1))
     xsipms, ysipms = datasipm["X"].values, datasipm["Y"].values
 
     ##########################################
@@ -105,7 +102,13 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     diffuse_electrons = partial(diffuse_electrons_, transverse_diffusion, longitudinal_diffusion)
     diffuse_electrons = fl.map(diffuse_electrons, args = ("x",  "y",  "z", "electrons"), out  = ("dx", "dy", "dz"))
 
-    simulate_electrons = fl.pipe(generate_ionization_electrons, drift_electrons, count_electrons, diffuse_electrons)
+    add_emmision_times = fl.map(lambda dz, times, electrons: dz + np.repeat(times, electrons)*drift_velocity, args = ("dz", "times", "electrons"), out = ("dz"))
+
+    voxelize_electrons = partial(voxelize_, voxel_size)
+    voxelize_electrons = fl.map(voxelize_electrons, args = ("dx", "dy", "dz"), out = ("dx", "dy", "dz", "nes"))
+
+    simulate_electrons = fl.pipe(generate_ionization_electrons, drift_electrons, count_electrons, diffuse_electrons,
+                                 add_emmision_times, voxelize_electrons)
 
     ############################################
     ############ SIMULATE PHOTONS ##############
@@ -131,7 +134,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     compute_S2pes_at_pmts = fl.map(compute_S2pes_at_pmts, args = ("S2photons", "dx", "dy"), out  = ("S2pes_at_pmts"))
 
     generate_S1_times_from_pes = fl.map(generate_S1_times_from_pes_, args=("S1pes_at_pmts"), out=("S1times"))
-    compute_S2times = lambda zs, times, electrons: zs/drift_velocity + np.repeat(times, electrons)
+    compute_S2times = lambda zs, times, electrons: zs/drift_velocity
     compute_S2times = fl.map(compute_S2times, args=("dz", "times", "electrons"), out=("S2times"))
 
     simulate_pmt_signal = fl.pipe(compute_S1pes_at_pmts, compute_S2pes_at_pmts, generate_S1_times_from_pes, compute_S2times)
