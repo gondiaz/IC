@@ -32,6 +32,7 @@ from invisible_cities.cities.detsim_simulate_signal    import pes_at_sipms
 from invisible_cities.cities.detsim_simulate_signal    import generate_S1_times_from_pes    as generate_S1_times_from_pes_
 
 from invisible_cities.cities.detsim_waveforms          import create_sensor_waveforms       as create_sensor_waveforms_
+from invisible_cities.cities.detsim_waveforms          import add_empty_sipmwfs             as add_empty_sipmwfs_
 
 from invisible_cities.cities.detsim_get_psf            import get_psf
 from invisible_cities.cities.detsim_get_psf            import get_ligthtables
@@ -72,7 +73,7 @@ def get_derived_parameters(detector_db, run_number,
 @city
 def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, sipm_psf,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
-           el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL, voxel_size,
+           el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL, voxel_size, sipm_frame,
            pretrigger, wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width,
            print_mod, compression):
 
@@ -86,7 +87,7 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
                                                                s1_ligthtable, s2_ligthtable, sipm_psf,
                                                                el_gain, conde_policarpo_factor, EL_dz, drift_velocity_EL,
                                                                wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width)
-    xsipms, ysipms = datasipm["X"].values, datasipm["Y"].values
+    # xsipms, ysipms = datasipm["X"].values, datasipm["Y"].values
 
     ##########################################
     ############ SIMULATE ELECTRONS ##########
@@ -140,8 +141,8 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     simulate_pmt_signal = fl.pipe(compute_S1pes_at_pmts, compute_S2pes_at_pmts, generate_S1_times_from_pes, compute_S2times)
 
     ## SIPMs ##
-    compute_S2pes_at_sipms = partial(pes_at_sipms, S2sipm_psf, xsipms, ysipms)
-    compute_S2pes_at_sipms = fl.map(compute_S2pes_at_sipms, args=("S2photons", "dx", "dy"), out=("S2pes_at_sipms"))
+    compute_S2pes_at_sipms = partial(pes_at_sipms, S2sipm_psf, datasipm, sipm_frame)
+    compute_S2pes_at_sipms = fl.map(compute_S2pes_at_sipms, args=("S2photons", "dx", "dy"), out=("S2pes_at_sipms", "sipmids"))
 
     #compute_S2times_EL = lambda S2times: np.concatenate([S2times + i*el_pitch/drift_velocity_EL for i in range(1, n_el_partitions+1)])
     compute_S2times_EL = lambda S2times: np.stack([S2times[:, np.newaxis] + i*el_pitch/(2*drift_velocity_EL) for i in range(1, n_el_partitions+1)], axis=1).flatten()
@@ -184,7 +185,10 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtab
     create_S2sipmwfs = partial(create_S2sipmwfs, s2_sipm_nsamples)
     create_S2sipmwfs = fl.map(create_S2sipmwfs, args=("S2buffertimes_sipm", "S2pes_at_sipms"), out=("sipmwfs"))
 
-    create_waveforms = fl.pipe(create_S1pmtwfs, create_S2pmtwfs, add_pmtwfs, create_S2sipmwfs)
+    add_empty_sipmwfs = partial(add_empty_sipmwfs_, (len(datasipm), int(wf_buffer_length // wf_sipm_bin_width)))
+    add_empty_sipmwfs = fl.map(add_empty_sipmwfs, args=("sipmwfs", "sipmids"), out=("sipmwfs"))
+
+    create_waveforms = fl.pipe(create_S1pmtwfs, create_S2pmtwfs, add_pmtwfs, create_S2sipmwfs, add_empty_sipmwfs)
 
     with tb.open_file(file_out, "w", filters = tbl.filters(compression)) as h5out:
 

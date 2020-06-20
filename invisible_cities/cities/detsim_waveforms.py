@@ -81,3 +81,12 @@ def create_sensor_waveforms(signal_type   : str,
         ValueError("signal_type must be one of S1 or S1")
 
     return create_sensor_waveforms_
+
+
+def add_empty_sipmwfs(shape : tuple,
+                      sipmwfs : np.ndarray,
+                      sipmids : np.ndarray):
+
+    allwfs = np.zeros(shape)
+    allwfs[sipmids] = sipmwfs
+    return allwfs

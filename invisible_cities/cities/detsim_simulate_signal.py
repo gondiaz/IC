@@ -28,13 +28,30 @@ def pes_at_pmts(LT      : Callable  ,
     return pes.T
 
 
-def pes_at_sipms(PSF     : Callable,
-                 xsensors: np.ndarray,
-                 ysensors: np.ndarray,
-                 photons : np.ndarray,
-                 xs      : np.ndarray,
-                 ys      : np.ndarray):
+def pes_at_sipms(PSF        : Callable,
+                 datasipm   : np.ndarray,
+                 sipm_frame : float,
+                 photons    : np.ndarray,
+                 xs         : np.ndarray,
+                 ys         : np.ndarray):
 
+    xsensors, ysensors = datasipm["X"].values, datasipm["Y"].values
+
+    xmin, xmax = np.min(xs), np.max(xs)
+    ymin, ymax = np.min(ys), np.max(ys)
+
+    x1, x2 = xmin - sipm_frame , xmax + sipm_frame
+    y1, y2 = ymin - sipm_frame , ymax + sipm_frame
+
+    selx = (x1<xsensors) & (xsensors<x2)
+    sely = (y1<ysensors) & (ysensors<y2)
+    sel = selx & sely
+
+    seldatasipm = datasipm[sel]
+    sipmids = seldatasipm.index.values
+    xsensors, ysensors = seldatasipm["X"].values, seldatasipm["Y"].values
+
+    ##########################
     xdistance = xs[:, np.newaxis] - xsensors
     ydistance = ys[:, np.newaxis] - ysensors
     distances = (xdistance**2 + ydistance**2)**0.5
@@ -45,7 +62,8 @@ def pes_at_sipms(PSF     : Callable,
 
     pes = np.multiply(psf, np.repeat(photons, npartitions))
     pes = np.random.poisson(pes/npartitions)
-    return pes
+
+    return pes, sipmids
 
 
 ##################################
