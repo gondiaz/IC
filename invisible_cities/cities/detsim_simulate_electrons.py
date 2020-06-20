@@ -48,6 +48,10 @@ def diffuse_electrons(transverse_diffusion   : float,
     ys = np.repeat(ys, electrons.astype(int))
     zs = np.repeat(zs, electrons.astype(int))
 
+    # substitute z<0 to z=0
+    sel = zs<0
+    zs[sel] = 0
+
     sqrtz = zs ** 0.5
     dxs  = np.random.normal(xs, sqrtz * transverse_diffusion)
     dys  = np.random.normal(ys, sqrtz * transverse_diffusion)
