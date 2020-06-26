@@ -22,6 +22,7 @@ def pes_at_pmts(LT      : Callable  ,
     """
     if np.any(zs): #S1
         pes = photons[:, np.newaxis] * LT(xs, ys, zs)
+        # pes = np.random.poisson(pes)
     else:          #S2
         pes = photons[:, np.newaxis] * LT(xs, ys)
     pes = np.random.poisson(pes)
@@ -62,7 +63,7 @@ def pes_at_sipms(PSF        : Callable,
 
     pes = np.multiply(psf, np.repeat(photons, npartitions))
     pes = np.random.poisson(pes/npartitions)
-
+    # pes = pes/npartitions
     return pes, sipmids
 
 

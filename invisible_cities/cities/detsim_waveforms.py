@@ -48,6 +48,35 @@ def create_waveform(times    : np.ndarray,
     return wf[:len(bins)-1]
 
 
+# from fast_histogram import histogram1d
+# def create_waveform(times    : np.ndarray,
+#                     pes      : np.ndarray,
+#                     bins     : np.ndarray,
+#                     nsamples : int) -> np.ndarray:
+#
+#     if (nsamples<1) or (nsamples>len(bins)):
+#         raise ValueError("nsamples must lay betwen 1 and len(bins) (inclusive)")
+#
+#     wf = np.zeros(len(bins)-1 + nsamples-1)
+#     if np.sum(pes)==0:
+#         return wf[:len(bins)-1]
+#
+#     if nsamples == 1:
+#         wf = histogram1d(times, len(bins)-1, (bins[0], bins[-1]), weights=pes)
+#         return np.random.poisson(wf)
+#
+#     ### DISTRIBUTED WAVEFORM IN NSAMPLES
+#     wf = np.zeros(len(bins)-1 + nsamples-1)
+#
+#     sel = in_range(times, bins[0], bins[-1])
+#     indexes = np.digitize(times[sel], bins) - 1
+#
+#     for index, count in zip(indexes, pes[sel]):
+#         wf[index:index+nsamples] += count/nsamples
+#
+#     return np.random.poisson(wf[:len(bins)-1])
+
+
 
 def create_sensor_waveforms(signal_type   : str,
                             buffer_length : float,
