@@ -19,7 +19,7 @@ def generate_s2_photons(el_gain        : float,
     the EL (after drift and diffusion)
     """
     # nphs = np.random.normal(el_gain, el_gain_sigma, size = n)
-    nphs = np.random.normal(el_gain*nes, el_gain_sigma*nes)
+    nphs = np.random.normal(el_gain*nes, np.sqrt(el_gain_sigma**2*nes))
     return nphs
 
 
