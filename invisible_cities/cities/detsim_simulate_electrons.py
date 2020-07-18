@@ -69,7 +69,6 @@ def voxelize(voxel_size : list,
     if voxel_size:
 
         ####### HISTOGRAM dx, dy, dz #######
-
         xmin, xmax = np.min(dx), np.max(dx)
         ymin, ymax = np.min(dy), np.max(dy)
         zmin, zmax = np.min(dz), np.max(dz)
@@ -85,7 +84,6 @@ def voxelize(voxel_size : list,
         H, _ = np.histogramdd((dx, dy, dz), bins=[xbins, ybins, zbins])
 
         ######### RECOVER dx, dy, dz with updated nes ######
-
         dx, dy, dz = np.meshgrid(xcenters, ycenters, zcenters, indexing="ij")
         dx, dy, dz = dx.flatten(), dy.flatten(), dz.flatten()
         nes = H.flatten()

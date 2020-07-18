@@ -87,26 +87,6 @@ def binedges_from_bincenters(bincenters):
 ##################################
 ############# PSF ################
 ##################################
-# def get_sipm_psf_from_file(filename : str,
-#                            factor   : float = 1.)->Callable:
-#     with tb.open_file(filename) as h5file:
-#         psf = h5file.root.PSF.PSFs.read()
-#
-#     #select psf z
-#     sel = (psf["z"] == np.min(psf["z"]))
-#     psf = psf[sel]
-#     xr, yr, f = psf["xr"], psf["yr"], psf["factor"]
-#
-#     #create binning
-#     xcenters, ycenters = np.unique(xr), np.unique(yr)
-#     xbins = binedges_from_bincenters(xcenters)
-#     ybins = binedges_from_bincenters(ycenters)
-#
-#     #histogram
-#     psf, _ = np.histogramdd((xr, yr), weights=f, bins=(xbins, ybins))
-#     H = factor * psf
-#     return create_xy_function(H, [xbins, ybins])
-
 def get_psf(filename):
     with tb.open_file(filename) as h5file:
         PSF = h5file.root.LightTable.table.read()
@@ -191,31 +171,3 @@ def get_ligthtables(filename: str,
                 return np.array([f(x, y) for f in list_of_functions]).T
             return merged
         return merge_list_of_functions(func_per_sensor)
-
-
-# def get_krmaps_as_ligthtables(filenames : str,
-#                               factor    : float = 1.)->Callable:
-#     """ reads KrMap and generate a psf function with the E0-map
-#     """
-#     func_per_sensor = []
-#     for filename in filenames:
-#         maps = read_maps(filename)
-#         xmin, xmax, ymin, ymax, nx, ny, _ = maps.mapinfo.values
-#         dx   = (xmax - xmin)/ float(nx)
-#         dy   = (ymax - ymin)/ float(ny)
-#         e0map  = factor * np.nan_to_num(np.array(maps.e0), 0.)
-#
-#         xbins = np.arange(xmin, xmax+dx, dx)
-#         ybins = np.arange(ymin, ymax+dy, dy)
-#         bins = [xbins, ybins]
-#
-#         fxy = create_xy_function(e0map, bins)
-#
-#         func_per_sensor.append(fxy)
-#
-#     ###### CREATE XY CALLABLE FOR LIST OF XY FUNCTIONS ####
-#     def merge_list_of_functions(list_of_functions):
-#         def merged(x, y):
-#             return np.array([f(x, y) for f in list_of_functions]).T
-#         return merged
-#     return merge_list_of_functions(func_per_sensor)
