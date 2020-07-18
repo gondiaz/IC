@@ -15,17 +15,23 @@ def create_waveform(times    : np.ndarray,
     This function builds a waveform from a set of (buffer_time, pes) values.
     This set is of values come from the times and pes arguments.
 
-    Input
-    times: a vector with the buffer times in which a photoelectron is produced in the
-    detector.
-    pes (from photoelecton): a vector with the photoelectrons produced in the detector in
-    each of the buffer times in times argument.
-    bins: a vector with the output waveform bin times (for example [0, 25, 50, ...] if
-    the detector has a sampling time of 25).
-    nsamples: an integer that controlls the distribution of the photoelectrons in each of
-    the waveform bins. The counts (N) in a given time bin (T) are distributed in the waveform
-    such as the nsamples posterior to T would have N/nsamples counts (included T).
-    nsamples must be >=1 an <len(bins).
+    Parameters:
+        :times: np.ndarray
+            a vector with the buffer times in which a photoelectron is produced in the detector.
+        :pes: np.ndarray
+            a vector with the photoelectrons produced in the detector in
+            each of the buffer times in times argument.
+        :bins: np.ndarray
+            a vector with the output waveform bin times (for example [0, 25, 50, ...] if
+            the detector has a sampling time of 25).
+        :nsamples: int
+            an integer that controlls the distribution of the photoelectrons in each of
+            the waveform bins. The counts (N) in a given time bin (T) are uniformly distributed
+            between T and the subsequent nsamples-1
+            nsamples must be >=1 an <len(bins).
+    Returns:
+        :wf: np.ndarray
+            waveform
     """
     if (nsamples<1) or (nsamples>len(bins)):
         raise ValueError("nsamples must lay betwen 1 and len(bins) (inclusive)")
@@ -77,7 +83,6 @@ def create_waveform(times    : np.ndarray,
 #     return np.random.poisson(wf[:len(bins)-1])
 
 
-
 def create_sensor_waveforms(signal_type   : str,
                             buffer_length : float,
                             bin_width     : float) -> Callable:
@@ -85,11 +90,16 @@ def create_sensor_waveforms(signal_type   : str,
     This function calls recursively to create_waveform. See create_waveform for
     an explanation of the arguments not explained below.
 
-    Input:
-    pes_at_sensors: an array with size (#sensors, len(times)). It is the same
-    as pes argument in create_waveform but for each sensor in axis 0.
-    wf_buffer_time: a float with the waveform extent (in default IC units)
-    bin_width: a float with the time distance between bins in the waveform buffer.
+    Parameters
+        :pes_at_sensors:
+            an array with size (#sensors, len(times)). It is the same
+            as pes argument in create_waveform but for each sensor in axis 0.
+        :wf_buffer_time:
+            a float with the waveform extent (in default IC units)
+        :bin_width:
+            a float with the time distance between bins in the waveform buffer.
+    Returns:
+        :create_sensor_waveforms_: function
     """
     bins = np.arange(0, buffer_length + bin_width, bin_width)
 
@@ -112,10 +122,12 @@ def create_sensor_waveforms(signal_type   : str,
     return create_sensor_waveforms_
 
 
-def add_empty_sipmwfs(shape : tuple,
+def add_empty_sipmwfs(shape   : tuple,
                       sipmwfs : np.ndarray,
                       sipmids : np.ndarray):
-
+    """
+    Add empty SIPMs waveforms.
+    """
     allwfs = np.zeros(shape)
     allwfs[sipmids] = sipmwfs
     return allwfs

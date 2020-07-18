@@ -13,9 +13,21 @@ from invisible_cities.core.core_functions  import in_range
 ###################################
 ############# UTILS ###############
 ###################################
-def create_xyz_function(H, bins):
+def create_xyz_function(H    : np.ndarray,
+                        bins : list)->Callable:
     """Given a 3D array and a list of bins for
-    each dim, it returns a x,y,z function"""
+    each dim, it returns a x,y,z function
+
+    Parameters:
+        :H: np.ndarray
+            3D histogram
+        :bins: list[np.ndarray, np.ndarray, np.ndarray]
+            list with the bin edges of :H:. The i-element corresponds
+            with the bin edges of the i-axis of :H:.
+    Returns:
+        :function:
+            x, y, z function that returns the correspondig histogram value
+    """
 
     xbins, ybins, zbins = bins
     if not H.shape == (len(xbins)-1, len(ybins)-1, len(zbins)-1):
@@ -40,9 +52,21 @@ def create_xyz_function(H, bins):
         return out
     return function
 
-def create_xy_function(H, bins):
+def create_xy_function(H    : np.ndarray,
+                       bins : list)->Callable::
     """Given a 2D array and a list of bins for
-    each dim, it returns a x,y,z function"""
+    each dim, it returns a x,y,z function
+
+    Parameters:
+        :H: np.ndarray
+            2D histogram
+        :bins: list[np.ndarray, np.ndarray]
+            list with the bin edges of :H:. The i-element corresponds
+            with the bin edges of the i-axis of :H:.
+    Returns:
+        :function:
+            x, y function that returns the correspondig histogram value
+    """
 
     xbins, ybins = bins
     if not H.shape == (len(xbins)-1, len(ybins)-1):
@@ -66,8 +90,18 @@ def create_xy_function(H, bins):
     return function
 
 
-def binedges_from_bincenters(bincenters):
+def binedges_from_bincenters(bincenters: np.ndarray)->np.ndarray:
+    """
+    computes bin-edges from bin-centers. The extremes of the edges are asigned to
+    the extremes of the bin centers.
 
+    Parameters:
+        :bincenters: np.ndarray
+            bin centers
+    Returns:
+        :binedges: np.ndarray
+            bin edges
+    """
     binedges = np.zeros(len(bincenters)+1)
 
     binedges[1:-1] = (bincenters[1:] + bincenters[:-1])/2.
@@ -87,7 +121,22 @@ def binedges_from_bincenters(bincenters):
 ##################################
 ############# PSF ################
 ##################################
-def get_psf(filename):
+def get_psf(filename : str)->Callable:
+    """
+    From PSF filename, returns a function of distance to SIPMs
+
+    Parameters:
+        :filename: str
+            path to the PSF h5 file
+    Returns:
+        :psf: function
+            for an array :d: of shape (nsensors, nhits) whose
+            values are the distances of sensor-i to hit-j, it return
+            the psf values for each distance. The output will be
+            an array of size (nsensors, nhits, npartitions) being npartitions
+            the number of EL-partitions
+    """
+
     with tb.open_file(filename) as h5file:
         PSF = h5file.root.LightTable.table.read()
         info = dict(h5file.root.Config.table.read())
@@ -111,6 +160,20 @@ def get_psf(filename):
 ##################################
 def get_ligthtables(filename: str,
                     signal  : str)->Callable:
+    """
+    From LT filename, returns a function of x,y,z for S1 LTs and x,y for S2
+    with the values of the LT for each sensor
+
+    Parameters:
+        :filename: str
+            path to the PSF h5 file
+    Returns:
+        :merged: function
+            (for S1) a function that merge the x, y, z functions for each sensor.
+            (each sensor has its own x, y, z distribution of ligth). The output would be
+            a np.ndarray with the LT value for x,y,z for each sensor.
+            (for S2) the same, being a x,y dependence
+    """
     ##### Load LT ######
     with tb.open_file(filename) as h5file:
         LT = h5file.root.LightTable.table.read()
@@ -156,13 +219,10 @@ def get_ligthtables(filename: str,
 
         ###### CREATE XY FUNCTION FOR EACH SENSOR ######
         func_per_sensor = []
-        # sensors = [f"PmtR11410_{i}" for i in range(0, 12)]
         for sensor in sensors:
             w = LT[sensor]
-
             H, _ = np.histogramdd((x, y), weights=w, bins=bins)
             fxy = create_xy_function(H, bins)
-
             func_per_sensor.append(fxy)
 
         ###### CREATE XY CALLABLE FOR LIST OF XY FUNCTIONS #####
