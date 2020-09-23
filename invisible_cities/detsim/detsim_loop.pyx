@@ -33,10 +33,67 @@ def electron_loop(np.ndarray[double, ndim=1] dx,
             dist = sqrt((dx[elindx]-xsipms[sipmindx])**2+(dy[elindx]-ysipms[sipmindx])**2)
             if dist>max_dist:
                 continue
-            for partindx in range(npartitions):     
+            for partindx in range(npartitions):
                 ts = times[elindx] + EL_times[partindx]
                 psf_bin = <int> floor(dist/EL_bin)
                 signal = PSF[psf_bin, partindx]/npartitions*photons[elindx]
                 sipmwf_timeindx = <int> floor(ts/sipm_time_bin)
                 sipmwfs[sipmindx,sipmwf_timeindx] += signal
     return sipmwfs
+
+
+############################
+###### create_waveform #####
+############################
+
+# cdef np.ndarray[np.int_t, ndim=1] weighted_histogram(np.ndarray[double, ndim=1] values,
+#                                                      np.ndarray[np.int_t, ndim=1] weights,
+#                                                      np.ndarray[double, ndim=1] bins):
+#     cdef np.ndarray[np.int_t, ndim=1] histogram = np.zeros(len(bins)-1, dtype=np.int)
+#     cdef int nbins = len(bins)
+#     cdef double binwidth = bins[1] - bins[0]
+#     cdef int i, j
+#
+#     for i in range(len(values)):
+#         j = <int> floor(values[i]/binwidth)
+#         histogram[j] += weights[i]
+#     return histogram
+
+cdef np.ndarray[double, ndim=1] weighted_histogram(np.ndarray [double, ndim=1] values,
+                                                    np.ndarray[double, ndim=1] weights,
+                                                    np.ndarray[double, ndim=1] bins):
+    cdef np.ndarray[double, ndim=1] histogram = np.zeros(len(bins)-1)
+    cdef int nbins = len(bins)
+    cdef double binwidth = bins[1] - bins[0]
+    cdef int i, j
+
+    for i in range(len(values)):
+        j = <int> floor(values[i]/binwidth)
+        histogram[j] += weights[i]
+    return histogram
+
+
+cdef np.ndarray[double, ndim=1] spread_histogram(np.ndarray[double, ndim=1] histogram, int nsamples):
+
+    cdef int l = len(histogram)
+    cdef np.ndarray[double, ndim=1] spreaded = np.zeros(l + nsamples-1)
+    cdef int h, i
+    cdef double v
+
+    for h in range(l):
+        v = histogram[h]/nsamples
+        for i in range(nsamples):
+            spreaded[h + i] += v
+    return spreaded[:l]
+
+
+def create_waveform(values, weights, bins, nsamples):
+
+    if (nsamples<1) or (nsamples>len(bins)):
+        raise ValueError("nsamples must lay betwen 1 and len(bins) (inclusive)")
+
+    cdef np.ndarray[double, ndim=1] wf = weighted_histogram(values, weights, bins)
+    if nsamples>1:
+        return spread_histogram(wf, nsamples)
+
+    return wf

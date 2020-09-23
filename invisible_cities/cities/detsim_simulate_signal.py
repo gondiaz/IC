@@ -30,9 +30,10 @@ def pes_at_pmts(LT      : Callable  ,
     """
     if np.any(zs): #S1
         pes = photons[:, np.newaxis] * LT(xs, ys, zs)
+        pes = np.random.poisson(pes)
     else:          #S2
         pes = photons[:, np.newaxis] * LT(xs, ys)
-    pes = np.random.poisson(pes)
+    # pes = np.random.poisson(pes)
     return pes.T
 
 
@@ -50,7 +51,7 @@ class S1_TIMES(rv_continuous):
         return (0.1*np.exp(-x/4.5) + 0.9*np.exp(-x/100))*1/(0.1*4.5 + 0.9*100)
 
 generate_S1_time = S1_TIMES()
-
+# @profile
 def generate_S1_times_from_pes(S1pes_at_pmts : np.ndarray)->list:
     """Given the S1pes_at_pmts, this function returns the times at which the pes
     are be distributed (see generate_S1_time function).

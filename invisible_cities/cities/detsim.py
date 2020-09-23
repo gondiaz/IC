@@ -52,8 +52,8 @@ def get_derived_parameters(detector_db, run_number,
     el_gain_sigma = np.sqrt(el_gain * conde_policarpo_factor)
 
     EL_dtime      =  EL_dz / drift_velocity_EL
-    s2_pmt_nsamples  = np.max((int(EL_dtime // wf_pmt_bin_width ), 1))
-    s2_sipm_nsamples = np.max((int(el_pitch // wf_sipm_bin_width), 1))
+    s2_pmt_nsamples  = max((int(EL_dtime // wf_pmt_bin_width ), 1))
+    # s2_sipm_nsamples = max((int(el_pitch // wf_sipm_bin_width), 1))
 
 
     return datapmt, datasipm,\
@@ -62,7 +62,7 @@ def get_derived_parameters(detector_db, run_number,
         s2_pmt_nsamples
 
 
-
+# @profile
 @city
 def detsim(files_in, file_out, event_range, detector_db, run_number, s1_ligthtable, s2_ligthtable, sipm_psf,
            ws, wi, fano_factor, drift_velocity, lifetime, transverse_diffusion, longitudinal_diffusion,
