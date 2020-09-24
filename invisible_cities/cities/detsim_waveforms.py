@@ -9,7 +9,7 @@ from ..detsim.detsim_loop  import electron_loop
 ######### WAVEFORMS ##############
 ##################################
 
-from ..detsim.detsim_loop  import create_waveform
+from .. detsim.detsim_loop  import create_waveform
 # @profile
 # def create_waveform(times    : np.ndarray,
 #                     pes      : np.ndarray,
@@ -79,7 +79,7 @@ def create_pmt_waveforms(signal_type   : str,
     bins = np.arange(0, buffer_length + bin_width, bin_width)
 
     if signal_type=="S1":
-
+        # @profile
         def create_pmt_waveforms_(S1times : list):
             wfs = np.stack([np.histogram(times, bins=bins)[0] for times in S1times])
             return wfs
