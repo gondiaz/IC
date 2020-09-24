@@ -2,6 +2,7 @@ import numpy as np
 cimport numpy as np
 from libc.math cimport sqrt, round, ceil, floor
 cimport cython
+from ..core.core_functions import in_range
 
 
 #@cython.boundscheck(False)
@@ -92,9 +93,9 @@ def create_waveform(values, weights, bins, nsamples):
     if (nsamples<1) or (nsamples>len(bins)):
         raise ValueError("nsamples must lay betwen 1 and len(bins) (inclusive)")
 
-    # add selection between bins[0] bins[-1]
+    cdef np.ndarray sel = in_range(values, bins[0], bins[-1])
 
-    cdef np.ndarray[double, ndim=1] wf = weighted_histogram(values, weights, bins)
+    cdef np.ndarray[double, ndim=1] wf = weighted_histogram(values[sel], weights[sel], bins)
     if nsamples>1:
         return spread_histogram(wf, nsamples)
 
