@@ -70,7 +70,7 @@ def pes_at_pmts(LT      : Callable  ,
 #     S1times = [generate_S1_time.rvs(size=pes) for pes in S1pes_pmt]
 #     return S1times
 
-from scipy.optimize import diagbroyden
+from scipy.optimize import brentq
 
 def generate_S1_time(size=1):
     tau1 = 4.5; tau2 = 100
@@ -80,14 +80,15 @@ def generate_S1_time(size=1):
     A1 = tau1*c1*N
     A2 = tau2*c2*N
 
-    P = np.random.random(size=size)
-
     def func(x):
         return A1*np.exp(-x/tau1) + A2*np.exp(-x/tau2) - P
 
-    sol = diagbroyden(func, np.full(size, tau2))
+    sol = []
+    for i in range(size):
+        P = np.random.random()
+        sol.append(brentq(func, 0, 10000))
 
-    return sol
+    return np.array(sol)
 
 # @profile
 def generate_S1_times_from_pes(S1pes_at_pmts : np.ndarray)->list:
