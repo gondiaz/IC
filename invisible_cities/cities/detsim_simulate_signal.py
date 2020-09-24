@@ -30,7 +30,7 @@ def pes_at_pmts(LT      : Callable  ,
     """
     if np.any(zs): #S1
         pes = photons[:, np.newaxis] * LT(xs, ys, zs)
-        pes = np.random.poisson(pes)
+        pes = np.random.poisson(np.sum(pes, axis=0))
     else:          #S2
         pes = photons[:, np.newaxis] * LT(xs, ys)
     # pes = np.random.poisson(pes)
@@ -105,6 +105,6 @@ def generate_S1_times_from_pes(S1pes_at_pmts : np.ndarray)->list:
             Each element are the S1 times for a PMT. If certain sensor
             do not see any pes, the array is empty.
     """
-    S1pes_pmt = np.sum(S1pes_at_pmts, axis=1)
-    S1times = [generate_S1_time(size=pes) for pes in S1pes_pmt]
+    # S1pes_pmt = np.sum(S1pes_at_pmts, axis=1)
+    S1times = [generate_S1_time(size=pes) for pes in S1pes_at_pmts]
     return S1times
