@@ -2,7 +2,6 @@ import numpy as np
 import scipy
 from typing import Callable
 import pandas as pd
-import line_profiler
 from ..core.core_functions import in_range
 from ..detsim.detsim_loop  import electron_loop
 ##################################
