@@ -33,7 +33,18 @@ def pes_at_pmts(LT      : Callable  ,
     return pes.T
 
 
-def generate_S1_time(size=1):
+def generate_S1_time(size : int=1)->np.ndarray:
+    """Generates random numbers following the hyper-exponential
+    distribution: 0.9 exp(-x/4.5) + 0.1 exp(-x/100).
+
+    Parameters:
+        :size: int
+            number of random numbers
+    Returns:
+        :sol: np.ndarray
+            the random number values
+    """
+
     tau1 = 4.5; tau2 = 100
     c1 = 0.1  ;c2 = 0.9
 
