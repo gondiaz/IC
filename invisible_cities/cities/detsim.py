@@ -22,7 +22,6 @@ from invisible_cities.cities.detsim_source             import load_MC
 from invisible_cities.cities.detsim_simulate_electrons import generate_ionization_electrons as generate_ionization_electrons_
 from invisible_cities.cities.detsim_simulate_electrons import drift_electrons               as drift_electrons_
 from invisible_cities.cities.detsim_simulate_electrons import diffuse_electrons             as diffuse_electrons_
-# from invisible_cities.cities.detsim_simulate_electrons import voxelize                      as voxelize_
 
 from invisible_cities.cities.detsim_simulate_signal    import pes_at_pmts
 from invisible_cities.cities.detsim_simulate_signal    import generate_S1_times_from_pes    as generate_S1_times_from_pes_
@@ -30,7 +29,6 @@ from invisible_cities.cities.detsim_simulate_signal    import generate_S1_times_
 from invisible_cities.cities.detsim_waveforms          import create_pmt_waveforms          as create_pmt_waveforms_
 from invisible_cities.cities.detsim_waveforms          import create_sipm_waveforms         as create_sipm_waveforms_
 
-# from invisible_cities.cities.detsim_get_psf            import get_ligthtables
 from invisible_cities.cities.detsim_get_psf            import create_lighttable_function
 
 
@@ -38,14 +36,10 @@ def get_derived_parameters(detector_db, run_number,
                            s1_lighttable, s2_lighttable, sipm_psf,
                            el_gain, conde_policarpo_factor, drift_velocity_EL,
                            wf_buffer_length, wf_pmt_bin_width, wf_sipm_bin_width):
-    ########################
-    ######## Globals #######
-    ########################
+
     datapmt  = db.DataPMT (detector_db, run_number)
     datasipm = db.DataSiPM(detector_db, run_number)
 
-    # S1_LT = get_ligthtables(s1_ligthtable, "S1")
-    # S2_LT = get_ligthtables(s2_ligthtable, "S2")
     S1_LT = create_lighttable_function(s1_lighttable)
     S2_LT = create_lighttable_function(s2_lighttable)
     PSF    = pd.read_hdf(sipm_psf, "/LightTable")
@@ -56,8 +50,6 @@ def get_derived_parameters(detector_db, run_number,
 
     EL_dtime      =  EL_dz / drift_velocity_EL
     s2_pmt_nsamples  = max((int(EL_dtime // wf_pmt_bin_width ), 1))
-    # s2_sipm_nsamples = max((int(el_pitch // wf_sipm_bin_width), 1))
-
 
     return datapmt, datasipm,\
         S1_LT, S2_LT, PSF,\
