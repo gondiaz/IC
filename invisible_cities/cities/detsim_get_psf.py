@@ -9,7 +9,22 @@ from invisible_cities.core.core_functions  import in_range
 from invisible_cities.core import system_of_units as units
 
 
-def create_lighttable_function(filename):
+def create_lighttable_function(filename : str)->Callable:
+    """ From a lighttable file, it returns a function of (x, y) for S2 signal
+    or (x, y, z) for S1 signal type. Signal type is read from the table.
+
+    Parameters:
+        :filename: str
+            name of the lighttable file
+    Returns:
+        :get_lt_values: Callable
+            this is a function which access the desired value inside
+            the lighttable. The lighttable values would be the nearest
+            points to the input positions. If the input positions are
+            outside the lighttable boundaries, zero is returned.
+            Input values must be vectors of same lenght, I. The output
+            shape will be (I, number_of_pmts).
+    """
 
     lt     = pd.read_hdf(filename, "LightTable")
     Config = pd.read_hdf(filename, "Config")
@@ -57,7 +72,6 @@ def create_lighttable_function(filename):
         zbins=binedges_from_bincenters(zcenters)
 
         def get_lt_values(xs, ys, zs):
-
             xindices = pd.cut(xs, xbins, labels=xcenters)
             yindices = pd.cut(ys, ybins, labels=ycenters)
             zindices = pd.cut(zs, zbins, labels=zcenters)
