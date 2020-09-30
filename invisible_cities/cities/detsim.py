@@ -11,6 +11,8 @@ import invisible_cities.database.load_db          as db
 
 from invisible_cities.cities.components import city
 from invisible_cities.cities.components import print_every
+from .  components import copy_mc_info
+from .  components import collect
 
 from invisible_cities.dataflow  import dataflow   as fl
 
@@ -142,6 +144,9 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_lighttab
     create_sipm_waveforms = fl.map(create_sipm_waveforms, args=("S2buffertimes", "S2photons", "dx", "dy"), out=("sipmwfs"))
 
 
+    event_count_in = fl.spy_count()
+    evtnum_collect = collect()
+
     with tb.open_file(file_out, "w", filters = tbl.filters(compression)) as h5out:
 
         ######################################
@@ -155,15 +160,23 @@ def detsim(files_in, file_out, event_range, detector_db, run_number, s1_lighttab
         write_run_event = partial(run_and_event_writer(h5out), run_number, timestamp=0)
         write_run_event = fl.sink(write_run_event, args=("event_number"))
 
-        return fl.push(source=load_MC(files_in),
-                       pipe  = fl.pipe(fl.slice(*event_range, close_all=True),
-                                       print_every(print_mod),
-                                       simulate_electrons,
-                                       simulate_photons,
-                                       # fl.spy(lambda d: [print(k) for k in d]),
-                                       create_pmt_waveforms,
-                                       create_sipm_waveforms,
-                                       fl.fork(write_pmtwfs,
-                                               write_sipmwfs,
-                                               write_run_event)),
-                        result = ())
+        result = fl.push(source=load_MC(files_in),
+                         pipe  = fl.pipe(fl.slice(*event_range, close_all=True),
+                                         event_count_in.spy    ,
+                                         print_every(print_mod),
+                                         simulate_electrons,
+                                         simulate_photons,
+                                         # fl.spy(lambda d: [print(k) for k in d]),
+                                         create_pmt_waveforms,
+                                         create_sipm_waveforms,
+                                         fl.branch("event_number"     ,
+                                                   evtnum_collect.sink),
+                                         fl.fork(write_pmtwfs,
+                                                 write_sipmwfs,
+                                                 write_run_event)),
+                         result = dict(events_in     = event_count_in.future,
+                                       evtnum_list   = evtnum_collect.future))
+
+        if run_number <= 0:
+            copy_mc_info(files_in, h5out, result.evtnum_list,
+                         detector_db, run_number)
