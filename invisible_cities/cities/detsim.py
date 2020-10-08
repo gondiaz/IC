@@ -20,10 +20,10 @@ from invisible_cities.io.rwf_io           import rwf_writer
 from invisible_cities.io.run_and_event_io import run_and_event_writer
 
 # DETSIM IMPORTS
-from invisible_cities.cities.detsim_source             import load_MC
-from invisible_cities.cities.detsim_simulate_electrons import generate_ionization_electrons as generate_ionization_electrons_
-from invisible_cities.cities.detsim_simulate_electrons import drift_electrons               as drift_electrons_
-from invisible_cities.cities.detsim_simulate_electrons import diffuse_electrons             as diffuse_electrons_
+from invisible_cities.cities.detsim_source      import load_MC
+from invisible_cities.detsim.simulate_electrons import generate_ionization_electrons as generate_ionization_electrons_
+from invisible_cities.detsim.simulate_electrons import drift_electrons               as drift_electrons_
+from invisible_cities.detsim.simulate_electrons import diffuse_electrons             as diffuse_electrons_
 
 from invisible_cities.cities.detsim_simulate_signal    import pes_at_pmts
 from invisible_cities.cities.detsim_simulate_signal    import generate_S1_times_from_pes    as generate_S1_times_from_pes_
