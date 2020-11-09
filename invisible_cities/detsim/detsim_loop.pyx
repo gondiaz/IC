@@ -82,9 +82,10 @@ cdef np.ndarray[double, ndim=1] spread_histogram(np.ndarray[double, ndim=1] hist
     cdef double v
 
     for h in range(l):
-        v = histogram[h]/nsamples
-        for i in range(nsamples):
-            spreaded[h + i] += v
+        if histogram[h]>0:
+            v = histogram[h]/nsamples
+            for i in range(nsamples):
+                spreaded[h + i] += v
     return spreaded[:l]
 
 
