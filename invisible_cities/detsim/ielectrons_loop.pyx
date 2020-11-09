@@ -7,6 +7,24 @@ from lighttables cimport LT
 cimport numpy as np
 from libc.math cimport ceil
 from libc.math cimport floor
+
+
+cdef double[:] spread_histogram(const double[:] histogram, int nsmear_left, int nsmear_right):
+    """Spreads histogram values uniformly nsmear_left bins to the left and nsmear_right to the right"""
+    cdef int nsamples = nsmear_left + nsmear_right
+    cdef int l = len(histogram)
+    cdef double [:] spreaded = np.zeros(l + nsamples-1)
+    cdef int h, i, aux
+    cdef double v
+    for h in range(nsmear_left, l):
+        if histogram[h]>0:
+            v = histogram[h]/nsamples
+            aux = h-nsmear_left
+            for i in range(nsamples):
+                spreaded[aux + i] += v
+    return spreaded[:l]
+
+
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -35,6 +53,10 @@ def electron_loop(double [:] xs,
     max_time_sns  = EL_gap/EL_drift_velocity/sensor_time_bin
     #EL_times_ corresponding to LT z partitions
     cdef double [:] EL_times_ = np.arange(time_bs_sns/2., max_time_sns+np.finfo(np.double).eps, time_bs_sns).astype(np.double)
+
+    #smearing factor in case time_bs_sns is larger than sensor_time_bin
+    cdef int nsmear = <int> ceil(time_bs_sns)
+
     cdef double[::1] LT_factors = np.empty_like(EL_times_, dtype=np.double)
     cdef double * LT_factors_ = &LT_factors[0]
 
@@ -59,5 +81,10 @@ def electron_loop(double [:] xs,
                     signal = LT_factors_[indx_EL] * ph_el
                     wfs[sns_id_indx, indx_time] += signal
 
+    if nsmear>1:
+        nsmear_left = <int> (nsmear/2)
+        nsmear_right = nsmear - nsmear_left
+        for sns_id_indx in range(nsens):
+            wfs[sns_id_indx] = spread_histogram(wfs[sns_id_indx], nsmear_left, nsmear_right)
     return wfs
 
