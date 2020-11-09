@@ -1,5 +1,14 @@
+import numpy  as np
+import pandas as pd
+import warnings
+
 cimport cython
 cimport numpy as np
+
+
+from ..core import system_of_units as units
+from ..io.dst_io import               load_dst
+
 cdef class LT:
     """Base abstract class to be inherited from for all LightTables classes.
     It needs get_values method implemented"""
@@ -27,4 +36,25 @@ cdef class LT:
 
 
     __repr__ =     __str__
+
+
+
+def extract_info_lighttables_(fname, group_name, el_gap, active_r):
+    lt_df      = load_dst(fname, group_name, "LightTable")
+    config_df  = load_dst(fname, group_name, "Config").set_index('parameter')
+    el_gap_f   = float(config_df.loc["EL_GAP"    ].value) * units.mm
+    active_r_f = float(config_df.loc["ACTIVE_rad"].value) * units.mm
+    if el_gap and (el_gap != el_gap_f):
+        warnings.warn('el_gap parameter mismatch, setting to user defined one',
+                      UserWarning)
+    else:
+        el_gap = el_gap_f
+
+    if active_r and (active_r != active_r_f):
+            warnings.warn('active_r parameter mismatch, setting to user defined one',
+                          UserWarning)
+    else:
+        active_r = active_r_f
+
+    return lt_df, config_df, el_gap, active_r
 
