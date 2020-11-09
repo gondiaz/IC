@@ -41,3 +41,29 @@ def test_LT_SiPM_optional_arguments(get_dfs):
         LT = LT_SiPM(fname=fname, sipm_database=datasipm, el_gap=2, active_r=150)
         assert LT.el_gap   == 2
         assert LT.active_r == 150
+
+@given(xs=floats(min_value=-500, max_value=500),
+       ys=floats(min_value=-500, max_value=500),
+       sipm_indx=integers(min_value=0, max_value=1500))
+def test_LT_SiPM_values(get_dfs, xs, ys, sipm_indx):
+    datasipm = DataSiPM('new')
+    fname, psf_df, psf_conf = get_dfs['psf']
+
+    r_active = psf_conf.loc['ACTIVE_rad'].astype(float).value
+    r = np.sqrt(xs**2 + ys**2)
+    psfbins = psf_df.index.values
+    lenz = psf_df.shape[1]
+    psf_df = psf_df /lenz
+    LT = LT_SiPM(fname=fname, sipm_database=datasipm)
+    x_sipm, y_sipm = datasipm.iloc[sipm_indx][['X', 'Y']]
+    dist = np.sqrt((xs-x_sipm)**2+(ys-y_sipm)**2)
+    psf_bin = np.digitize(dist, psfbins)-1
+    max_psf = psf_df.index.max()
+    if (dist>=max_psf) or (r>=r_active):
+        values = np.zeros(psf_df.shape[1])
+    else:
+        values = (psf_df.loc[psf_bin].values)
+
+    ltvals = LT.get_values(xs, ys, sipm_indx)
+    np.testing.assert_allclose(values, ltvals)
+
