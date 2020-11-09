@@ -67,3 +67,28 @@ def test_LT_SiPM_values(get_dfs, xs, ys, sipm_indx):
     ltvals = LT.get_values(xs, ys, sipm_indx)
     np.testing.assert_allclose(values, ltvals)
 
+
+def find_nearest_(array, value):
+    """Finds nearest element of an array"""
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+
+@given(xs=floats(min_value=-500, max_value=500),
+       ys=floats(min_value=-500, max_value=500),
+       pmt_indx=integers(min_value=0, max_value=11))
+def test_LT_PMTs_values(get_dfs, xs, ys, pmt_indx):
+    fname, lt_df, lt_conf = get_dfs['lt']
+    r_active = lt_conf.loc['ACTIVE_rad'].astype(float).value
+    r = np.sqrt(xs**2 + ys**2)
+
+    LT = LT_PMT(fname=fname)
+
+    xs_lt =  find_nearest_(np.sort(np.unique(lt_df.index.get_level_values('x'))), xs)
+    ys_lt =  find_nearest_(np.sort(np.unique(lt_df.index.get_level_values('y'))), ys)
+    if (r>=r_active):
+        values = np.array([0]) #the values are one dimension only
+    else:
+        values = lt_df.loc[xs_lt, ys_lt].values[pmt_indx]
+    ltvals = LT.get_values(xs, ys, pmt_indx)
+    np.testing.assert_allclose(values, ltvals)
