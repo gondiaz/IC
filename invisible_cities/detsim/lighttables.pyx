@@ -126,3 +126,63 @@ cdef class LT_SiPM(LT):
         values = &self.values[bin_id, 0]
         return values
 
+
+cdef class LT_PMT(LT):
+    cdef readonly:
+        double el_gap
+        double active_r
+    cdef:
+        double [:, :, :, ::1] values
+        double [:] xcenters
+        double [:] ycenters
+        double el_bin
+        double max_zel
+        double max_psf
+        double max_psf2
+        double inv_binx
+        double inv_biny
+        double xmin
+        double ymin
+        double active_r2
+
+    def __init__(self, *, fname, el_gap=None, active_r=None):
+        lt_df, config_df, el_gap, active_r = extract_info_lighttables_(fname, 'LT', el_gap, active_r)
+        lt_df.set_index(['x', 'y'], inplace=True)
+        self.el_gap   = el_gap
+        self.active_r = active_r
+        self.active_r2 = active_r**2
+        sensor = config_df.loc["sensor"].value
+        lt_df  = lt_df.drop(columns=[sensor+"_total"])
+        self.el_bin      = el_gap #this is hardcoded for this specific table, should this be in config?
+        self.zbins_      = np.arange(self.el_bin/2., el_gap+np.finfo(float).eps, self.el_bin).astype(np.double)
+        self.sensor_ids_ = np.arange(lt_df.shape[1]).astype(np.intc)
+        xcenters   = np.sort(np.unique(lt_df.index.get_level_values('x')))
+        ycenters   = np.sort(np.unique(lt_df.index.get_level_values('y')))
+        indx       = pd.MultiIndex.from_product([xcenters, ycenters], names=['x', 'y'])
+        values_aux = lt_df.reindex(indx, fill_value=0).values.reshape(len(xcenters), len(ycenters), lt_df.shape[1])[..., None]
+        lenz = len(self.zbins)
+        self.values = np.asarray(np.repeat(values_aux, lenz, axis=-1), dtype=np.double, order='C')
+        self.xcenters = xcenters
+        self.ycenters = ycenters
+        self.xmin = min(xcenters)
+        self.ymin = min(ycenters)
+        bin_x = float(config_df.loc["pitch_x"].value) * units.mm
+        bin_y = float(config_df.loc["pitch_y"].value) * units.mm
+        self.inv_binx = 1./bin_x
+        self.inv_biny = 1./bin_y
+
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.cdivision(True)
+    @cython.initializedcheck(False)
+    cdef double* get_values_(self, const double x, const double y, const int sns_id):
+        cdef:
+            double*  values
+            int xindx_, yindx_
+        if (x*x+y*y)>=self.active_r2 :
+            return NULL
+        xindx_ = <int> cround((x-self.xmin)*self.inv_binx)
+        yindx_ = <int> cround((y-self.ymin)*self.inv_biny)
+        values = &self.values[xindx_, yindx_, sns_id, 0]
+        return values
