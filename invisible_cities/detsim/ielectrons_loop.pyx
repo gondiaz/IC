@@ -28,10 +28,10 @@ cdef double[:] spread_histogram(const double[:] histogram, int nsmear_left, int 
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def electron_loop(double [:] xs,
-                  double [:] ys,
-                  double [:] ts,
-                  np.ndarray[unsigned long, ndim=1] phs,
+def electron_loop(double  [:] xs,
+                  double  [:] ys,
+                  double  [:] ts,
+                  int     [:] phs,
                   LT LT,
                   double EL_drift_velocity,
                   double sensor_time_bin,
@@ -60,7 +60,8 @@ def electron_loop(double [:] xs,
     cdef double * LT_factors_ = &LT_factors[0]
 
     cdef int indx_el, indx_time, sns_id_indx, sns_id, indx_EL
-    cdef double x_el, y_el, ph_el, time_el
+    cdef double x_el, y_el, time_el
+    cdef int ph_el
     cdef double signal, time
 
     for indx_el in range(ts.shape[0]):
