@@ -65,8 +65,6 @@ cdef class LT_SiPM(LT):
     cdef readonly:
         double [:] snsx
         double [:] snsy
-        double el_gap
-        double active_r
     cdef:
         double [:, ::1] values
         double psf_bin
@@ -128,9 +126,6 @@ cdef class LT_SiPM(LT):
 
 
 cdef class LT_PMT(LT):
-    cdef readonly:
-        double el_gap
-        double active_r
     cdef:
         double [:, :, :, ::1] values
         double [:] xcenters
