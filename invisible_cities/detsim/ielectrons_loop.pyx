@@ -34,7 +34,6 @@ def electron_loop(double [:] xs,
                   np.ndarray[unsigned long, ndim=1] phs,
                   LT LT,
                   double EL_drift_velocity,
-                  double EL_gap,
                   double sensor_time_bin,
                   double buffer_length):
 
@@ -45,7 +44,7 @@ def electron_loop(double [:] xs,
         double [:] zs = LT.zbins
         int num_bins = <int> ceil (buffer_length/sensor_time_bin)
         double [:, :] wfs = np.zeros([nsens, num_bins], dtype=np.double)
-
+        double EL_gap = LT.el_gap
 
     #lets create vector of EL_times
     zs_bs = EL_gap/zs.shape[0]
@@ -76,8 +75,8 @@ def electron_loop(double [:] xs,
                 for indx_EL in range(EL_times_.shape[0]):
                     time = time_el + EL_times_[indx_EL]
                     indx_time = <int> floor(time)
-                    # if indx_time>=num_bins:
-                    #     continue
+                    if indx_time>=num_bins:
+                        continue
                     signal = LT_factors_[indx_EL] * ph_el
                     wfs[sns_id_indx, indx_time] += signal
 
@@ -86,5 +85,6 @@ def electron_loop(double [:] xs,
         nsmear_right = nsmear - nsmear_left
         for sns_id_indx in range(nsens):
             wfs[sns_id_indx] = spread_histogram(wfs[sns_id_indx], nsmear_left, nsmear_right)
-    return wfs
+
+    return np.asarray(wfs)
 
