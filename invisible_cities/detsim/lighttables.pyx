@@ -128,8 +128,6 @@ cdef class LT_SiPM(LT):
 cdef class LT_PMT(LT):
     cdef:
         double [:, :, :, ::1] values
-        double [:] xcenters
-        double [:] ycenters
         double el_bin
         double max_zel
         double max_psf
@@ -141,28 +139,36 @@ cdef class LT_PMT(LT):
         double active_r2
 
     def __init__(self, *, fname, el_gap=None, active_r=None):
+        from scipy.interpolate import griddata
         lt_df, config_df, el_gap, active_r = extract_info_lighttables_(fname, 'LT', el_gap, active_r)
-        lt_df.set_index(['x', 'y'], inplace=True)
+        #lt_df.set_index(['x', 'y'], inplace=True)
         self.el_gap   = el_gap
         self.active_r = active_r
         self.active_r2 = active_r**2
+
         sensor = config_df.loc["sensor"].value
-        lt_df  = lt_df.drop(columns=[sensor+"_total"])
+        columns = [col for col in lt_df.columns if ((sensor in col) and ("total" not in col))]
         self.el_bin      = el_gap #this is hardcoded for this specific table, should this be in config?
         self.zbins_      = np.arange(self.el_bin/2., el_gap+np.finfo(float).eps, self.el_bin).astype(np.double)
         self.sensor_ids_ = np.arange(lt_df.shape[1]).astype(np.intc)
-        xcenters   = np.sort(np.unique(lt_df.index.get_level_values('x')))
-        ycenters   = np.sort(np.unique(lt_df.index.get_level_values('y')))
-        indx       = pd.MultiIndex.from_product([xcenters, ycenters], names=['x', 'y'])
-        values_aux = lt_df.reindex(indx, fill_value=0).values.reshape(len(xcenters), len(ycenters), lt_df.shape[1])[..., None]
-        lenz = len(self.zbins)
-        self.values = np.asarray(np.repeat(values_aux, lenz, axis=-1), dtype=np.double, order='C')
-        self.xcenters = xcenters
-        self.ycenters = ycenters
-        self.xmin = min(xcenters)
-        self.ymin = min(ycenters)
+        xtable   = lt_df.x.values
+        ytable   = lt_df.y.values
+        xmin_, xmax_ = xtable.min(), xtable.max()
+        ymin_, ymax_ = ytable.min(), ytable.max()
         bin_x = float(config_df.loc["pitch_x"].value) * units.mm
         bin_y = float(config_df.loc["pitch_y"].value) * units.mm
+        # extend min, max to go over the active volume
+        xmin, xmax = xmin_-np.ceil((self.active_r-np.abs(xmin_))/bin_x)*bin_x, xmax_+np.ceil((self.active_r-np.abs(xmax_))/bin_x)*bin_x
+        ymin, ymax = ymin_-np.ceil((self.active_r-np.abs(ymin_))/bin_y)*bin_y, ymax_+np.ceil((self.active_r-np.abs(ymax_))/bin_y)*bin_y
+        #create new centers
+        x          = np.arange(xmin, xmax+np.finfo(float).eps, bin_x).astype(np.double)
+        y          = np.arange(ymin, ymax+np.finfo(float).eps, bin_y).astype(np.double)
+        xx, yy     = np.meshgrid(x, y)
+        values_aux = (np.concatenate([griddata((xtable, ytable), lt_df[column], (yy, xx), method='nearest')[..., None] for column in columns],axis=-1)[..., None]).astype(np.double)
+        lenz = len(self.zbins)
+        self.values = np.asarray(np.repeat(values_aux, lenz, axis=-1), dtype=np.double, order='C')
+        self.xmin = xmin
+        self.ymin = ymin
         self.inv_binx = 1./bin_x
         self.inv_biny = 1./bin_y
 
