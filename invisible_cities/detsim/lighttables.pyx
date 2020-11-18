@@ -96,6 +96,8 @@ cdef class LT_SiPM(LT):
         self.max_zel     = el_gap
         self.max_psf     = max(lt_df.index.values)
         self.max_psf2    = self.max_psf**2
+        self.nsensors    = len(self.sensor_ids_)
+
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -111,6 +113,8 @@ cdef class LT_SiPM(LT):
             double tmp_x
             double tmp_y
             double*  values
+        if sns_id >= self.nsensors:
+            return NULL
         xsipm = self.snsx[sns_id]
         ysipm = self.snsy[sns_id]
         tmp_x = x-xsipm; tmp_y = y-ysipm
@@ -171,7 +175,7 @@ cdef class LT_PMT(LT):
         self.ymin = ymin
         self.inv_binx = 1./bin_x
         self.inv_biny = 1./bin_y
-
+        self.nsensors = len(self.sensor_ids_)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -182,6 +186,8 @@ cdef class LT_PMT(LT):
             double*  values
             int xindx_, yindx_
         if (x*x+y*y)>=self.active_r2 :
+            return NULL
+        if sns_id >= self.nsensors:
             return NULL
         xindx_ = <int> cround((x-self.xmin)*self.inv_binx)
         yindx_ = <int> cround((y-self.ymin)*self.inv_biny)
