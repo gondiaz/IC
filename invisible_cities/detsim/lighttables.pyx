@@ -154,7 +154,7 @@ cdef class LT_PMT(LT):
         columns = [col for col in lt_df.columns if ((sensor in col) and ("total" not in col))]
         self.el_bin      = el_gap #this is hardcoded for this specific table, should this be in config?
         self.zbins_      = np.arange(self.el_bin/2., el_gap+np.finfo(float).eps, self.el_bin).astype(np.double)
-        self.sensor_ids_ = np.arange(lt_df.shape[1]).astype(np.intc)
+        self.sensor_ids_ = np.arange(len(columns)).astype(np.intc)
         xtable   = lt_df.x.values
         ytable   = lt_df.y.values
         xmin_, xmax_ = xtable.min(), xtable.max()
