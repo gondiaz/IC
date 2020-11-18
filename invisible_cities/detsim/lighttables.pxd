@@ -2,6 +2,7 @@ cdef class LT:
     cdef readonly:
         double el_gap
         double active_r
+        int    nsensors
     cdef:
         int    [:] sensor_ids_
         double [:] zbins_
