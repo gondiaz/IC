@@ -165,8 +165,8 @@ cdef class LT_PMT(LT):
         xmin, xmax = xmin_-np.ceil((self.active_r-np.abs(xmin_))/bin_x)*bin_x, xmax_+np.ceil((self.active_r-np.abs(xmax_))/bin_x)*bin_x
         ymin, ymax = ymin_-np.ceil((self.active_r-np.abs(ymin_))/bin_y)*bin_y, ymax_+np.ceil((self.active_r-np.abs(ymax_))/bin_y)*bin_y
         #create new centers
-        x          = np.arange(xmin, xmax+np.finfo(float).eps, bin_x).astype(np.double)
-        y          = np.arange(ymin, ymax+np.finfo(float).eps, bin_y).astype(np.double)
+        x          = np.arange(xmin, xmax+bin_x/2., bin_x).astype(np.double)
+        y          = np.arange(ymin, ymax+bin_y/2., bin_y).astype(np.double)
         xx, yy     = np.meshgrid(x, y)
         values_aux = (np.concatenate([griddata((xtable, ytable), lt_df[column], (yy, xx), method='nearest')[..., None] for column in columns],axis=-1)[..., None]).astype(np.double)
         lenz = len(self.zbins)
