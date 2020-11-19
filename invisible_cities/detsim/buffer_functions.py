@@ -126,20 +126,21 @@ def buffer_calculator(buffer_len: float, pre_trigger: float,
                 pad_safe(sipm_charge[:, sipm_slice], sipm_pad))
 
 
-    def position_signal(triggers   :       List,
-                        pmt_bins   : np.ndarray,
-                        pmt_charge :  pd.Series,
-                        sipm_bins  : np.ndarray,
-                        sipm_charge:  pd.Series
+    def position_signal(triggers   :       List                  ,
+                        pmt_bins   : np.ndarray                  ,
+                        pmt_charge : Union[pd.Series, np.ndarray],
+                        sipm_bins  : np.ndarray                  ,
+                        sipm_charge: Union[pd.Series, np.ndarray]
                         ) -> List[Tuple[np.ndarray, np.ndarray]]:
         """
         Synchronises the SiPMs and PMTs for each identified
         trigger and calls the padding function to fill with
         zeros where necessary.
         """
-        pmt_q  = np.asarray(pmt_charge.tolist())
-        sipm_q = np.empty((0,0))\
-          if sipm_charge.empty else np.asarray(sipm_charge.tolist())
+        if isinstance(pmt_charge, pd.Series):
+            pmt_q  = np.asarray(pmt_charge.tolist())
+            sipm_q = np.empty((0,0))\
+            if sipm_charge.empty else np.asarray(sipm_charge.tolist())
         return [generate_slice(trigger, pmt_bins, pmt_q, sipm_bins, sipm_q)
                 for trigger in triggers                                    ]
     return position_signal
