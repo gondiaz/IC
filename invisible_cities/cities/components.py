@@ -510,7 +510,8 @@ def load_MC(files_in : List[str]) -> Generator:
                        y            = hits.y     .values,
                        z            = hits.z     .values,
                        energy       = hits.energy.values,
-                       time         = hits.time  .values)
+                       time         = hits.time  .values,
+                       label        = hits.label .values)
 
 
 def sensor_data(path, wf_type):
