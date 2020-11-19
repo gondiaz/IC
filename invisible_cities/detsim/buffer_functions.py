@@ -1,9 +1,10 @@
 import numpy  as np
 import pandas as pd
 
-from typing import  Callable
-from typing import      List
-from typing import     Tuple
+from typing import Callable
+from typing import     List
+from typing import    Tuple
+from typing import    Union
 
 from .. reco.peak_functions import indices_and_wf_above_threshold
 from .. reco.peak_functions import                 split_in_peaks
@@ -41,14 +42,17 @@ def bin_sensors(sensors   : pd.DataFrame,
 
 ## !! to-do: clarify for non-pmt versions of next
 ## !! to-do: Check on integral instead of only threshold?
-def find_signal_start(wfs          : pd.Series,
-                      bin_threshold: float    ,
-                      stand_off    : int      ) -> List[int]:
+def find_signal_start(wfs          : Union[pd.Series, np.ndarray],
+                      bin_threshold: float                       ,
+                      stand_off    : int                         ) -> List[int]:
     """
     Finds signal in the binned waveforms and
     identifies candidate triggers.
     """
-    eng_sum = wfs.sum()
+    if isinstance(wfs, np.ndarray):
+        eng_sum = wfs.sum(axis=0)
+    else:
+        eng_sum = wfs.sum()
     indices = indices_and_wf_above_threshold(eng_sum,
                                              bin_threshold).indices
     ## Just using this and the stand_off for now

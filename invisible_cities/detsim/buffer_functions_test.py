@@ -62,6 +62,22 @@ def test_find_signal_start(binned_waveforms, signal_thresh):
     assert np.all(pmt_sum[pulses] > signal_thresh)
 
 
+@mark.parametrize("signal_thresh", (2, 10))
+def test_find_signal_start_numpy(binned_waveforms, signal_thresh):
+
+    pmt_bins, pmt_wfs, *_ = binned_waveforms
+
+    buffer_length = 800 * units.mus
+    bin_width     = np.diff(pmt_bins)[0]
+    stand_off     = int(buffer_length / bin_width)
+
+    pmt_sum       = pmt_wfs.sum()
+    pmt_wfs_np    = np.asarray(pmt_wfs.tolist())
+    pulses        = find_signal_start(pmt_wfs_np, signal_thresh, stand_off)
+
+    assert np.all(pmt_sum[pulses] > signal_thresh)
+
+
 def test_find_signal_start_correct_index():
 
     thresh     = 5
