@@ -179,8 +179,9 @@ def create_lighttable_function(filename : str)->Callable:
 
 def binedges_from_bincenters(bincenters: np.ndarray)->np.ndarray:
     """
-    computes bin-edges from bin-centers. The extremes of the edges are asigned to
-    the extremes of the bin centers.
+    computes bin-edges from bin-centers.
+    The lowest bin edge is assigned to the lowest bin center.
+    The highest bin edge is assigned to the highest bin center extended a 1%
     Parameters:
         :bincenters: np.ndarray
             bin centers
@@ -195,6 +196,6 @@ def binedges_from_bincenters(bincenters: np.ndarray)->np.ndarray:
 
     binedges[1:-1] = (bincenters[1:] + bincenters[:-1])/2.
     binedges[0]  = bincenters[0]
-    binedges[-1] = bincenters[-1]
+    binedges[-1] = bincenters[-1]*1.1
 
     return binedges
