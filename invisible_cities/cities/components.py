@@ -495,15 +495,12 @@ def hits_and_kdst_from_files(paths: List[str]) -> Iterator[Dict[str,Union[HitCol
                            timestamp = timestamp)
 
 
-def load_MC(files_in : List[str]) -> Generator:
-
+def MC_hits_from_files(files_in : List[str]) -> Generator:
     for filename in files_in:
-
         try:
             hits_df = load_mchits_df(filename)
         except tb.exceptions.NoSuchNodeError:
             continue
-
         for evt, hits in hits_df.groupby(level=0):
             yield dict(event_number = evt,
                        x            = hits.x     .values,
