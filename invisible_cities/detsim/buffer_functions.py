@@ -141,6 +141,9 @@ def buffer_calculator(buffer_len: float, pre_trigger: float,
             pmt_q  = np.asarray(pmt_charge.tolist())
             sipm_q = np.empty((0,0))\
             if sipm_charge.empty else np.asarray(sipm_charge.tolist())
+        else:
+            pmt_q  = pmt_charge
+            sipm_q = sipm_charge
         return [generate_slice(trigger, pmt_bins, pmt_q, sipm_bins, sipm_q)
                 for trigger in triggers                                    ]
     return position_signal
