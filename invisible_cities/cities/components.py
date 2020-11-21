@@ -502,7 +502,9 @@ def MC_hits_from_files(files_in : List[str]) -> Generator:
         except tb.exceptions.NoSuchNodeError:
             continue
         for evt, hits in hits_df.groupby(level=0):
+            timestamp = 0
             yield dict(event_number = evt,
+                       timestamp    = timestamp,
                        x            = hits.x     .values,
                        y            = hits.y     .values,
                        z            = hits.z     .values,
