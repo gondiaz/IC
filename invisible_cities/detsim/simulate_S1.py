@@ -84,7 +84,8 @@ def generate_S1_times_from_pes(S1_pes_at_pmts : np.ndarray,
 
 def create_S1_waveforms(S1_times      : list,
                         buffer_length : float,
-                        bin_width     : float)->np.ndarray:
+                        bin_width     : float,
+                        start_time    : float = 0)->np.ndarray:
     """
     Create S1 waveform : S1_times are histogramed in a waveform
     of given buffer_length and bin_width
@@ -97,7 +98,7 @@ def create_S1_waveforms(S1_times      : list,
             waveforms with buffer_length and bin_width
     """
     bins = np.arange(0, buffer_length + bin_width, bin_width)
-    wfs  = np.stack([np.histogram(times, bins=bins)[0] for times in S1_times])
+    wfs  = np.stack([np.histogram(times-start_time, bins=bins)[0] for times in S1_times])
     return wfs
 
 
