@@ -874,7 +874,7 @@ def calculate_and_save_buffers(buffer_length    : float        ,
                                        "pmt_bins" ,  "pmt_bin_wfs",
                                        "sipm_bins", "sipm_bin_wfs")        ,
                                out  = "buffers"                            )
-
+    var_to_write = 'ordered_buffers' if order_sensors is not None else 'buffers'
     buffer_writer_    = sink(buffer_writer(h5out                  ,
                                            run_number = run_number,
                                            n_sens_eng = npmt      ,
@@ -882,7 +882,7 @@ def calculate_and_save_buffers(buffer_length    : float        ,
                                            length_eng = nsamp_pmt ,
                                            length_trk = nsamp_sipm),
                              args = ("event_number", "evt_times"  ,
-                                     "ordered_buffers"            ))
+                                     var_to_write            ))
 
     fn_list = (find_signal      ,
                event_times      ,
