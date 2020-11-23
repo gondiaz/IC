@@ -35,7 +35,8 @@ def electron_loop(double  [:] xs,
                   LT LT,
                   double EL_drift_velocity,
                   double sensor_time_bin,
-                  double buffer_length):
+                  double buffer_length,
+                  double tmin = 0):
 
 
     cdef:
@@ -74,7 +75,7 @@ def electron_loop(double  [:] xs,
             LT_factors_ = LT.get_values_(x_el, y_el, sns_id)
             if LT_factors_ != NULL:
                 for indx_EL in range(EL_times_.shape[0]):
-                    time = time_el + EL_times_[indx_EL]
+                    time = time_el - tmin + EL_times_[indx_EL]
                     indx_time = <int> floor(time)
                     if indx_time>=num_bins:
                         continue
