@@ -117,65 +117,39 @@ def create_lighttable_function(filename : str)->Callable:
             Input values must be vectors of same lenght, I. The output
             shape will be (I, number_of_pmts).
     """
-
     lt     = load_dst(filename, "LT", "LightTable")
     Config = load_dst(filename, "LT", "Config")    .set_index("parameter")
+    sensor = Config.loc["sensor"]     .value
+    lt     = lt.drop(sensor + "_total", axis=1) # drop total column
 
-    signaltype = Config.loc["signal_type"].value
-    sensor     = Config.loc["sensor"]     .value
+    def get_lt_values(xs, ys, zs):
+        if len(zs) == 1:
+            zs = np.full(len(xs), zs)
+        if not (len(xs) == len(ys) == len(zs)):
+            raise Exception("input arrays must be of same shape")
+        xindices = pd.cut(xs, xbins, include_lowest=True)
+        yindices = pd.cut(ys, ybins, include_lowest=True)
+        zindices = pd.cut(zs, zbins, include_lowest=True)
+        indices = pd.Index(zip(xindices, yindices, zindices), name=("x", "y", "z"))
+        mask    = indices.isin(lt.index)
+        values  = np.zeros((len(xs), nsensors))
+        values[mask] = lt.loc[indices[mask]]
+        return values
 
-    lt = lt.drop(sensor + "_total", axis=1) # drop total column
+    if lt.get("z") is None:
+        lt["z"] = 1 # add fake z
+        had_z = False
+    else: had_z = True
 
-    if signaltype == "S1":
+    lt = lt.set_index(["x", "y", "z"])
+    nsensors = lt.shape[-1]
 
-        lt = lt.set_index(["x", "y", "z"])
-        nsensors = lt.shape[-1]
+    xbins=binedges_from_bincenters(np.unique(lt.index.get_level_values('x')))
+    ybins=binedges_from_bincenters(np.unique(lt.index.get_level_values('y')))
+    zbins=binedges_from_bincenters(np.unique(lt.index.get_level_values('z')))
 
-        xcenters = np.sort(np.unique(lt.index.get_level_values('x')))
-        ycenters = np.sort(np.unique(lt.index.get_level_values('y')))
-        zcenters = np.sort(np.unique(lt.index.get_level_values('z')))
-
-        xbins=binedges_from_bincenters(xcenters)
-        ybins=binedges_from_bincenters(ycenters)
-        zbins=binedges_from_bincenters(zcenters)
-
-        def get_lt_values(xs, ys, zs):
-            if not (xs.shape == ys.shape == zs.shape):
-                raise Exception("input arrays must be of same shape")
-            xindices = pd.cut(xs, xbins, labels=xcenters)
-            yindices = pd.cut(ys, ybins, labels=ycenters)
-            zindices = pd.cut(zs, zbins, labels=zcenters)
-            indices = pd.Index(zip(xindices, yindices, zindices), name=("x", "y", "z"))
-
-            mask = indices.isin(lt.index)
-            values = np.zeros((len(xs), nsensors))
-            values[mask] = lt.loc[indices[mask]]
-            return values
-
-    elif signaltype == "S2":
-
-        lt = lt.set_index(["x", "y"])
-        nsensors = lt.shape[-1]
-
-        xcenters = np.sort(np.unique(lt.index.get_level_values('x')))
-        ycenters = np.sort(np.unique(lt.index.get_level_values('y')))
-
-        xbins=binedges_from_bincenters(xcenters)
-        ybins=binedges_from_bincenters(ycenters)
-
-        def get_lt_values(xs, ys):
-            if not (xs.shape == ys.shape):
-                raise Exception("input arrays must be of same shape")
-            xindices = pd.cut(xs, xbins, labels=xcenters)
-            yindices = pd.cut(ys, ybins, labels=ycenters)
-            indices = pd.Index(zip(xindices, yindices), name=("x", "y"))
-
-            mask = indices.isin(lt.index)
-            values = np.zeros((len(xs), nsensors))
-            values[mask] = lt.loc[indices[mask]]
-            return values
-
-    return get_lt_values
+    if had_z: return get_lt_values
+    else:     return partial(get_lt_values, zs=np.array([1]))
 
 
 def binedges_from_bincenters(bincenters: np.ndarray)->np.ndarray:
