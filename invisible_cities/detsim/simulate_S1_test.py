@@ -87,7 +87,7 @@ def test_binedges_from_bincenters():
     bincenters = np.array([-1, 0, 2, 10])
     binedges = binedges_from_bincenters(bincenters)
     # particular case
-    assert np.all(binedges == np.array([-1, -0.5, 1, 6, 10]))
+    assert np.all(binedges == np.array([-1, -0.5, 1, 6, 11]))
 
     bincenters = np.array([-1, 0, 2, 10, 9])
     # exception
