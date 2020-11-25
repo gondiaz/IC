@@ -82,13 +82,25 @@ def generate_S1_times_from_pes(S1_pes_at_pmts : np.ndarray,
     return S1_times
 
 
-def create_S1_waveforms(S1_times      : list,
-                        buffer_length : float,
-                        bin_width     : float,
-                        start_time    : float = 0)->np.ndarray:
+def S1_waveforms_creator(s1_lighttable, ws, wf_pmt_bin_width):
+    S1_LT = create_lighttable_function(os.path.expandvars(s1_lighttable))
+
+    def create_S1_waveforms_from_hits(x, y, z, time, energy, tmin, buffer_length):
+        s1_photons     = np.random.poisson(energy / ws)
+        s1_pes_at_pmts = compute_S1_pes_at_pmts(x, y, z, s1_photons, S1_LT)
+        s1times = generate_S1_times_from_pes(s1_pes_at_pmts, time)
+        s1_wfs  = histogram_S1_times(s1times, buffer_length, wf_pmt_bin_width, tmin)
+        return s1_wfs
+
+    return create_S1_waveforms_from_hits
+
+
+def histogram_S1_times(S1_times      : list,
+                       buffer_length : float,
+                       bin_width     : float,
+                       bias_time     : float=0)->np.ndarray:
     """
-    Create S1 waveform : S1_times are histogramed in a waveform
-    of given buffer_length and bin_width
+    S1_times are histogramed in a waveform of given buffer_length and bin_width
     Parameters
         :S1_times: list
             output of generate_S1_times_from_pes, list of size equal to the
@@ -98,7 +110,7 @@ def create_S1_waveforms(S1_times      : list,
             waveforms with buffer_length and bin_width
     """
     bins = np.arange(0, buffer_length + bin_width, bin_width)
-    wfs  = np.stack([np.histogram(times-start_time, bins=bins)[0] for times in S1_times])
+    wfs  = np.stack([np.histogram(times-bias_time, bins=bins)[0] for times in S1_times])
     return wfs
 
 
