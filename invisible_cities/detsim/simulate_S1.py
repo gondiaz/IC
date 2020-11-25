@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 
@@ -12,7 +13,24 @@ from .. core import system_of_units as units
 from .. io.dst_io  import load_dst
 
 
-def compute_S1_pes_at_pmts(xs      : np.ndarray,
+def compute_scintillation_photons(energy : np.ndarray,
+                                  ws     : float):
+    """Computes the number of scintillation photons produced
+    in each energy deposition hit
+    Parameters:
+        :energy: np.ndarray
+            vector with the energy values of each hit
+        :ws: float
+            inverse scintillation yield
+    Returns:
+        np.ndarray
+        The number of photons at each hit they are poisson
+        distributed with mean energy/ws
+    """
+    return np.random.poisson(energy / ws)
+
+
+def compute_s1_pes_at_pmts(xs      : np.ndarray,
                            ys      : np.ndarray,
                            zs      : np.ndarray,
                            photons : np.ndarray,
@@ -28,24 +46,33 @@ def compute_S1_pes_at_pmts(xs      : np.ndarray,
     Returns:
         :pes: np.ndarray
             photoelectrons at each PMT produced by all hits.
+            shape is (number_of_sensors, number_of_hits)
     """
     pes = photons[:, np.newaxis] * LT(xs, ys, zs)
     pes = np.random.poisson(pes)
     return pes.T
 
-tau1 = 4.5; c1 = 0.1
-tau2 = 100; c2 = 0.9
 
-N = 1/(c1*tau1 + c2*tau2)
-A1 = tau1*c1*N
-A2 = tau2*c2*N
+def s1_hyper_exp_cdf_(x : float,
+                      P : float):
+    """ This function returns the cumulative distibution of hyper-exponential
+    distribution: 0.9 exp(-x/4.5) + 0.1 exp(-x/100) minus the value P.
+    This is a private function to be called by generate_s1_time, which uses inverse
+    transform sampling to compute the S1 times values, therefore, P should be
+    a value between 0 and 1.
+    """
+    tau1  = 4.5 * units.ns
+    tau2  = 100 * units.ns
+    c1 = 0.1
+    c2 = 0.9
+    norm = 1/(c1*tau1 + c2*tau2)
+    return norm*tau1*c1*np.exp(-x/tau1) + norm*tau2*c2*np.exp(-x/tau2) - P
 
-def S1_minimize(x, P):
-    return A1*np.exp(-x/tau1) + A2*np.exp(-x/tau2) - P
 
-def generate_S1_time(size : int)->np.ndarray:
+def generate_s1_time(size : int)->np.ndarray:
     """Generates random numbers following the hyper-exponential
     distribution: 0.9 exp(-x/4.5) + 0.1 exp(-x/100).
+    This function uses inverse-transform-sampling method.
     Parameters:
         :size: int
             number of random numbers
@@ -53,16 +80,13 @@ def generate_S1_time(size : int)->np.ndarray:
         :sol: np.ndarray
             the random number values
     """
-    sol = []
-    for i in range(size):
-        P = np.random.random()
-        sol.append(brentq(S1_minimize, 0, 10000, args=P))
+    sol = [brentq(s1_hyper_exp_cdf_, 0, 10000, args=np.random.random()) for i in range(size)]
     return np.array(sol)
 
 
-def generate_S1_times_from_pes(S1_pes_at_pmts : np.ndarray,
+def generate_s1_times_from_pes(s1_pes_at_pmts : np.ndarray,
                                hit_times      : np.ndarray)->list:
-    """Given the S1_pes_at_pmts, this function returns the times at which the pes
+    """Given the s1_pes_at_pmts, this function returns the times at which the pes
     are be distributed (see generate_S1_time function).
     It returns a list whose elements are the times at which the photoelectrons in that PMT
     are generated.
@@ -74,43 +98,49 @@ def generate_S1_times_from_pes(S1_pes_at_pmts : np.ndarray,
             Each element are the S1 times for a PMT. If certain sensor
             do not see any pes, the array is empty.
     """
-    S1_times = []
-    for pes_at_pmt in S1_pes_at_pmts:
+    s1_times = []
+    for pes_at_pmt in s1_pes_at_pmts:
         repeated_times = np.repeat(hit_times, pes_at_pmt)
-        times = generate_S1_time(np.sum(pes_at_pmt))
-        S1_times.append(times + repeated_times)
-    return S1_times
+        times = generate_s1_time(np.sum(pes_at_pmt))
+        s1_times.append(times + repeated_times)
+    return s1_times
 
 
-def S1_waveforms_creator(s1_lighttable, ws, wf_pmt_bin_width):
+def s1_waveforms_creator(s1_lighttable, ws, wf_pmt_bin_width):
     S1_LT = create_lighttable_function(os.path.expandvars(s1_lighttable))
 
-    def create_S1_waveforms_from_hits(x, y, z, time, energy, tmin, buffer_length):
-        s1_photons     = np.random.poisson(energy / ws)
-        s1_pes_at_pmts = compute_S1_pes_at_pmts(x, y, z, s1_photons, S1_LT)
-        s1times = generate_S1_times_from_pes(s1_pes_at_pmts, time)
-        s1_wfs  = histogram_S1_times(s1times, buffer_length, wf_pmt_bin_width, tmin)
+    def create_s1_waveforms_from_hits(x, y, z, time, energy, tmin, buffer_length):
+        s1_photons     = compute_scintillation_photons(energy, ws)
+        s1_pes_at_pmts = compute_s1_pes_at_pmts(x, y, z, s1_photons, S1_LT)
+        s1times = generate_s1_times_from_pes(s1_pes_at_pmts, time)
+        s1_wfs  = histogram_s1_times(s1times, buffer_length, wf_pmt_bin_width, tmin)
         return s1_wfs
 
-    return create_S1_waveforms_from_hits
+    return create_s1_waveforms_from_hits
 
 
-def histogram_S1_times(S1_times      : list,
+def histogram_s1_times(S1_times      : list,
                        buffer_length : float,
                        bin_width     : float,
-                       bias_time     : float=0)->np.ndarray:
+                       start_time    : float=0)->np.ndarray:
     """
-    S1_times are histogramed in a waveform of given buffer_length and bin_width
+    S1_times are histogramed in a waveform.
     Parameters
         :S1_times: list
             output of generate_S1_times_from_pes, list of size equal to the
             number of pmts. Each element is an array with the times of the S1
+        :buffer_length: float
+            waveform buffer lenght in time units
+        :bin_width: float
+            waveform bin width in time units
+        :start_time:
+            waveform time of first bin edge in time units
     Returns:
         :wfs: np.ndarray
-            waveforms with buffer_length and bin_width
+            waveforms with start_time, buffer_length and bin_width
     """
-    bins = np.arange(0, buffer_length + bin_width, bin_width)
-    wfs  = np.stack([np.histogram(times-bias_time, bins=bins)[0] for times in S1_times])
+    bins = np.arange(start_time, start_time + buffer_length + bin_width, bin_width)
+    wfs  = np.stack([np.histogram(times, bins=bins)[0] for times in S1_times])
     return wfs
 
 
@@ -131,7 +161,8 @@ def create_lighttable_function(filename : str)->Callable:
     """
     lt     = load_dst(filename, "LT", "LightTable")
     Config = load_dst(filename, "LT", "Config")    .set_index("parameter")
-    sensor = Config.loc["sensor"]     .value
+    sensor = Config.loc["sensor"].value
+    act_r  = float(Config.loc["ACTIVE_rad"].value)
     lt     = lt.drop(sensor + "_total", axis=1) # drop total column
 
     def get_lt_values(xs, ys, zs):
@@ -139,9 +170,9 @@ def create_lighttable_function(filename : str)->Callable:
             zs = np.full(len(xs), zs)
         if not (len(xs) == len(ys) == len(zs)):
             raise Exception("input arrays must be of same shape")
-        xindices = pd.cut(xs, xbins, include_lowest=True)
-        yindices = pd.cut(ys, ybins, include_lowest=True)
-        zindices = pd.cut(zs, zbins, include_lowest=True)
+        xindices = pd.cut(xs, xbins, include_lowest=True, labels=xcenters)
+        yindices = pd.cut(ys, ybins, include_lowest=True, labels=ycenters)
+        zindices = pd.cut(zs, zbins, include_lowest=True, labels=zcenters)
         indices = pd.Index(zip(xindices, yindices, zindices), name=("x", "y", "z"))
         mask    = indices.isin(lt.index)
         values  = np.zeros((len(xs), nsensors))
@@ -156,33 +187,46 @@ def create_lighttable_function(filename : str)->Callable:
     lt = lt.set_index(["x", "y", "z"])
     nsensors = lt.shape[-1]
 
-    xbins=binedges_from_bincenters(np.unique(lt.index.get_level_values('x')))
-    ybins=binedges_from_bincenters(np.unique(lt.index.get_level_values('y')))
-    zbins=binedges_from_bincenters(np.unique(lt.index.get_level_values('z')))
+    xcenters = np.unique(lt.index.get_level_values('x'))
+    ycenters = np.unique(lt.index.get_level_values('y'))
+    zcenters = np.unique(lt.index.get_level_values('z'))
+
+    xbins = binedges_from_bincenters(xcenters, range=(-act_r, act_r))
+    ybins = binedges_from_bincenters(ycenters, range=(-act_r, act_r))
+    zbins = binedges_from_bincenters(zcenters)
 
     if had_z: return get_lt_values
     else:     return partial(get_lt_values, zs=np.array([1]))
 
 
-def binedges_from_bincenters(bincenters: np.ndarray)->np.ndarray:
+def binedges_from_bincenters(bincenters: np.ndarray,
+                             range     : Tuple = None)->np.ndarray:
     """
     computes bin-edges from bin-centers.
-    The lowest bin edge is assigned to the lowest bin center.
-    The highest bin edge is assigned to the highest bin center extended a 1%
     Parameters:
         :bincenters: np.ndarray
             bin centers
+        :range: np.ndarray
+            tuple with the lowest and higher bin edge, respectively
     Returns:
         :binedges: np.ndarray
             bin edges
     """
     if np.any(bincenters[:-1] >= bincenters[1:]):
         raise Exception("Unsorted or repeted bin centers")
+    if range is None:
+        range = (bincenters[0], bincenters[-1])
+    else:
+        if not (range[0]<range[1]):
+            raise Exception("lower edge must be slower than higher")
+        if (range[0]>bincenters[0]) or (bincenters[-1]>range[-1]):
+            raise Exception("bincenters out of range bounds")
 
     binedges = np.zeros(len(bincenters)+1)
 
     binedges[1:-1] = (bincenters[1:] + bincenters[:-1])/2.
-    binedges[0]  = bincenters[0]
-    binedges[-1] = bincenters[-1]*1.1
+
+    binedges[0]  = range[0]
+    binedges[-1] = range[-1]
 
     return binedges
