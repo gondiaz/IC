@@ -28,10 +28,11 @@ from .. detsim.simulate_electrons import diffuse_electrons
 from .. detsim.lighttables        import LT_SiPM
 from .. detsim.lighttables        import LT_PMT
 from .. detsim.ielectrons_loop    import electron_loop
-from .. detsim.simulate_S1        import create_lighttable_function
-from .. detsim.simulate_S1        import compute_S1_pes_at_pmts
-from .. detsim.simulate_S1        import generate_S1_times_from_pes
-from .. detsim.simulate_S1        import create_S1_waveforms
+# from .. detsim.simulate_S1        import create_lighttable_function
+# from .. detsim.simulate_S1        import compute_S1_pes_at_pmts
+# from .. detsim.simulate_S1        import generate_S1_times_from_pes
+# from .. detsim.simulate_S1        import create_S1_waveforms
+from .. detsim.simulate_S1 import s1_waveforms_creator
 
 
 # @profile
@@ -157,7 +158,7 @@ def hits_selector (active_only=True):
 
 
 def ielectron_simulator(wi, fano_factor, lifetime, transverse_diffusion, longitudinal_diffusion, drift_velocity, el_gain, el_gain_sigma):
-    def simulate_ielectrons(x, y, z, time, energy):        
+    def simulate_ielectrons(x, y, z, time, energy):
         electrons = generate_ionization_electrons(energy, wi, fano_factor)
         electrons = drift_electrons(z, electrons, lifetime, drift_velocity)
         dx, dy, dz = diffuse_electrons(x, y, z, electrons, transverse_diffusion, longitudinal_diffusion)
@@ -176,15 +177,15 @@ def buffer_times_and_length_getter(wf_pmt_bin_width, wf_sipm_bin_width, el_gap, 
         return start_time, buffer_length
     return get_buffer_times_and_length
 
-def s1_waveforms_creator(s1_lighttable, ws, wf_pmt_bin_width):
-    S1_LT = create_lighttable_function(os.path.expandvars(s1_lighttable))
-    def create_s1_waveforms(x, y, z, time, energy, tmin, buffer_length):
-        s1_photons = np.random.poisson(energy / ws)
-        s1_pes_at_pmts = compute_S1_pes_at_pmts(x, y, z, s1_photons, S1_LT)
-        s1times = generate_S1_times_from_pes(s1_pes_at_pmts, time)
-        s1_wfs = create_S1_waveforms(s1times, buffer_length, wf_pmt_bin_width, tmin)
-        return s1_wfs
-    return create_s1_waveforms
+# def s1_waveforms_creator(s1_lighttable, ws, wf_pmt_bin_width):
+#     S1_LT = create_lighttable_function(os.path.expandvars(s1_lighttable))
+#     def create_s1_waveforms(x, y, z, time, energy, tmin, buffer_length):
+#         s1_photons = np.random.poisson(energy / ws)
+#         s1_pes_at_pmts = compute_S1_pes_at_pmts(x, y, z, s1_photons, S1_LT)
+#         s1times = generate_S1_times_from_pes(s1_pes_at_pmts, time)
+#         s1_wfs = create_S1_waveforms(s1times, buffer_length, wf_pmt_bin_width, tmin)
+#         return s1_wfs
+#     return create_s1_waveforms
 
 
 def s2_waveform_creator (sns_bin_width, LT, EL_drift_velocity):
@@ -199,7 +200,3 @@ def bin_edges_getter(wf_pmt_bin_width, wf_sipm_bin_width):
         sipm_bins = np.arange(0, sipm_wfs.shape[1])*wf_sipm_bin_width
         return pmt_bins, sipm_bins
     return get_bin_edges
-    
-    
-    
-
