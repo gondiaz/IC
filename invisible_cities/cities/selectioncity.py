@@ -13,6 +13,8 @@ import tables as tb
 
 from functools import partial
 
+from invisible_cities.reco import tbl_functions        as tbl
+
 from invisible_cities.cities.components import city
 
 from invisible_cities.dataflow import dataflow as fl
@@ -138,7 +140,7 @@ def filter_event(selected_events, event_ts):
 @city
 def selectioncity(files_in, file_out,
                   selected_events_filename,
-                  event_range):
+                  event_range, compression):
 
     ###### get file structure and create empty file_out ####
     structure = get_file_structure(np.random.choice(files_in))
@@ -152,7 +154,7 @@ def selectioncity(files_in, file_out,
     count_all  = fl.spy_count()
     count_pass = fl.spy_count()
 
-    with tb.open_file(file_out, "w") as h5file:
+    with tb.open_file(file_out, "w", filters = tbl.filters(compression)) as h5file:
 
         copy_file_structure(h5file, structure)
 
