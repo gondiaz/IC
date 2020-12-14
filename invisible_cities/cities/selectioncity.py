@@ -7,7 +7,7 @@ This city selects the events and its data from
 whichever IC data type.
 
 """
-
+import os
 import numpy  as np
 import tables as tb
 
@@ -29,6 +29,9 @@ def get_file_structure(filename):
     d = dict()
     with tb.open_file(filename) as h5file:
         for node in h5file.walk_nodes():
+            name = node._v_pathname
+            if "MC" in name:
+                continue
             ####### Table #########
             if isinstance(node, tb.Table):
                 d[node._v_pathname] = dict(nodetype = tb.Table               ,
@@ -50,28 +53,6 @@ def get_file_structure(filename):
     return d
 
 
-# def create_file_from_structure(filename, structure):
-#     with tb.open_file(filename, "w") as h5file:
-#         for node in structure:
-#             if structure[node]["nodetype"] is tb.Table:
-#
-#                 h5file.create_table(structure[node]["where"]                   ,
-#                                     structure[node]["name"]                    ,
-#                                     description= structure[node]["description"],
-#                                     title      = structure[node]["title"]      ,
-#                                     filters    = structure[node]["filters"]    ,
-#                                     createparents=True)
-#
-#             if structure[node]["nodetype"] is tb.EArray:
-#
-#                 h5file.create_earray(structure[node]["where"]        ,
-#                                      structure[node]["name"]         ,
-#                                      atom  = structure[node]["atom"] ,
-#                                      shape = structure[node]["shape"],
-#                                      title = structure[node]["title"],
-#                                      createparents = True)
-
-
 def copy_file_structure(h5file, structure):
     for node in structure:
         if structure[node]["nodetype"] is tb.Table:
@@ -91,68 +72,72 @@ def copy_file_structure(h5file, structure):
                                  createparents = True)
 
 
-def general_source(files_in):
-    for file in files_in:
-        with tb.open_file(file, "r") as h5file:
-            ######
-            d_ = dict()
-            for node in h5file.walk_nodes():
-                if isinstance(node, (tb.Table, tb.EArray)):
-                    d_[node._v_pathname] = node.read()
-            ######
+def get_general_source(selection_file):
+
+    def general_source(files_in):
+        selected_events = np.load(os.path.expandvars(selection_file))
+
+        for file in files_in:
             d = dict()
-            events = d_["/Run/events"]["evt_number"]
-            for i, event in enumerate( events ):
-                selevent = np.eye(1, M=len(events), k=i, dtype=bool)[0]
-                for node in d_:
-                    if len(d_[node]) == len(events):
-                        d[node] = d_[node][selevent]
-                    else:
-                        try:
-                            sel = d_[node]["event"] == event
-                            d[node] = d_[node][sel]
-                        except (IndexError, ValueError):
-                            d["g" + node] = d_[node]
-                yield d
+            d[file] = file
+            if len(selected_events)==0:
+                return
+
+            with tb.open_file(file, "r") as h5file:
+
+                events = h5file.root.Run.events.read()["evt_number"]
+                selidxs = np.argwhere(np.isin(events, selected_events)).flatten()
+                events_in_file  = events[selidxs]
+                selected_events = selected_events[~np.isin(selected_events, events)]
+
+                for i, event in zip(selidxs, events_in_file):
+                    for node in h5file.walk_nodes():
+                        name = node._v_pathname
+                        if "MC" in name:
+                            continue
+                        if isinstance(node, tb.EArray):
+                            d[name] = node[i][np.newaxis, :]
+                        if isinstance(node, tb.Table):
+                            table = node.read()
+                            try:
+                                sel = (table["evt_number"] == event)
+                                d[name] = table[sel]
+                            except (IndexError, ValueError):
+                                d["g" + name] = node.read()
+                    yield d
+
+    return general_source
 
 
 def general_writer(h5file, d):
     for nodename in d:
         # check if global node has been filled, if not, fill it
         if nodename[0] == "g":
-            globalnode = h5file.get_node( nodename[1:] )
+            globalnode = h5file.get_node(nodename[1:])
             if globalnode.nrows == 0:
-                globalnode.append( d[nodename] )
+                globalnode.append(d[nodename])
                 continue
             else:
                 continue
-        # fill event data
-        node = h5file.get_node( nodename )
-        node.append(d[nodename])
+
+        if isinstance(d[nodename], np.ndarray):
+            # fill event data
+            node = h5file.get_node(nodename)
+            node.append(d[nodename])
     h5file.flush()
 
 
-def filter_event(selected_events, event_ts):
-    sel = np.isin( event_ts["evt_number"], selected_events)
-    return bool(sel)
-
-
 @city
-def selectioncity(files_in, file_out,
-                  selected_events_filename,
+def selectioncity(files_in, file_out, selection,
                   event_range, compression):
+
+    general_source = get_general_source(selection)
 
     ###### get file structure and create empty file_out ####
     structure = get_file_structure(np.random.choice(files_in))
-    # create_file_from_structure(file_out, structure)
-
-    #### define filter #####
-    selected_events = np.loadtxt(selected_events_filename, dtype=int)
-    filter = fl.filter(partial(filter_event, selected_events), args="/Run/events")
 
     ###### define counters #####
-    count_all  = fl.spy_count()
-    count_pass = fl.spy_count()
+    count  = fl.spy_count()
 
     with tb.open_file(file_out, "w", filters = tbl.filters(compression)) as h5file:
 
@@ -160,10 +145,9 @@ def selectioncity(files_in, file_out,
 
         writer = fl.sink(partial(general_writer, h5file ))
 
-        return fl.push(source = general_source(files_in),
-                       pipe   = fl.pipe(count_all  .spy,
-                                        filter         ,
-                                        count_pass.spy ,
-                                        writer)        ,
-                         result = dict(n_total = count_all .future,
-                                       n_pass  = count_pass.future))
+        result = fl.push(source = general_source(files_in),
+                         pipe   = fl.pipe(count.spy,
+                                          fl.spy(lambda d: [print(d[nodename]) for nodename in d if isinstance(d[nodename], str)]),
+                                          fl.fork(writer)),
+                         result = dict(n_total = count.future))
+        return result
