@@ -72,10 +72,11 @@ def copy_file_structure(h5file, structure):
                                  createparents = True)
 
 
-def get_general_source(selection_file):
+def get_general_source(selection):
 
     def general_source(files_in):
-        selected_events = np.load(os.path.expandvars(selection_file))
+        selection_filename = os.path.expandvars(selection)
+        selected_events = np.load(selection_filename)
 
         for file in files_in:
             d = dict()
@@ -89,6 +90,7 @@ def get_general_source(selection_file):
                 selidxs = np.argwhere(np.isin(events, selected_events)).flatten()
                 events_in_file  = events[selidxs]
                 selected_events = selected_events[~np.isin(selected_events, events)]
+                np.save(selection_filename, selected_events)
 
                 for i, event in zip(selidxs, events_in_file):
                     for node in h5file.walk_nodes():
