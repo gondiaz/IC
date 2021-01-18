@@ -92,8 +92,11 @@ def create_lighttable_function(filename : str, active_r : Optional[float]=None)-
     ycenters = np.unique(lt.index.get_level_values('y'))
     zcenters = np.unique(lt.index.get_level_values('z'))
 
-    xbins = binedges_from_bincenters(xcenters, range=(-act_r, act_r))
-    ybins = binedges_from_bincenters(ycenters, range=(-act_r, act_r))
+    # the range for binedges is set to act_r if it is larger than the LT centers
+    range_x = (min(xcenters[0], -act_r), max(xcenters[-1], +act_r)) # centers are ordered
+    range_y = (min(ycenters[0], -act_r), max(ycenters[-1], +act_r))
+    xbins = binedges_from_bincenters(xcenters, range=range_x)
+    ybins = binedges_from_bincenters(ycenters, range=range_y)
     zbins = binedges_from_bincenters(zcenters)
 
     if had_z: return get_lt_values
